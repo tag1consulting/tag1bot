@@ -1,0 +1,18 @@
+[package]
+name = "tag1bot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.51"
+async-std = { version = "1.10.0", features = ["attributes"] }
+env_logger = "0.8.4"
+lazy_static = "1.4"
+log = "0.4.14"
+rand = "0.8.5"
+regex = "1.5"
+rusqlite = { version = "0.27.0", features = ["bundled"] }
+serde =  { version = "1.0.130", features = ["derive"] }
+slack-rust = { git = "https://github.com/jeremyandrews/slack-rust" }
