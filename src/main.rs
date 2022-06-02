@@ -239,11 +239,20 @@ where
                                     let re = Regex::new(REGEX_KARMA_PLUS).unwrap();
                                     let cap = re.captures(trimmed_text).unwrap();
                                     let text = cap.get(1).map_or("", |m| m.as_str());
-                                    let karma = increment_karma(&text.to_lowercase());
-                                    (
-                                        thread_ts,
-                                        format!("Karma for `{}` increased to {}.", text, karma),
-                                    )
+                                    //Only run karma if user is not self-incrementing
+                                    if user.to_lowercase() != text.to_lowercase() {
+                                        let karma = increment_karma(&text.to_lowercase());
+                                        (
+                                            thread_ts,
+                                            format!("Karma for `{}` increased to {}.", text, karma),
+                                        )
+                                    } else {
+                                        let karma = decrement_karma(&text.to_lowercase());
+                                        (
+                                            thread_ts,
+                                            format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", text, karma),
+                                        )
+                                    }
                                 } else {
                                     let re = Regex::new(REGEX_KARMA_MINUS).unwrap();
                                     let cap = re.captures(trimmed_text).unwrap();
