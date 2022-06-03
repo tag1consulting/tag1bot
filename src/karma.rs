@@ -91,7 +91,7 @@ pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, St
                         let karma = decrement(&item.to_lowercase());
                         (
                             thread_ts,
-                            format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", text, karma),
+                            format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", item, karma),
                         )
                     }
                 } else {
