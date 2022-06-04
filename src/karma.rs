@@ -80,11 +80,20 @@ pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, St
                     let re = Regex::new(REGEX_KARMA_PLUS).unwrap();
                     let cap = re.captures(trimmed_text).unwrap();
                     let item = cap.get(1).map_or("", |m| m.as_str());
-                    let karma = increment(&item.to_lowercase());
-                    (
-                        thread_ts,
-                        format!("Karma for `{}` increased to {}.", item, karma),
-                    )
+                    //Only run karma if user is not self-incrementing
+                    if message.user.to_lowercase() != item.to_lowercase() {
+                        let karma = increment(&item.to_lowercase());
+                        (
+                            thread_ts,
+                            format!("Karma for `{}` increased to {}.", item, karma),
+                        )
+                    } else {
+                        let karma = decrement(&item.to_lowercase());
+                        (
+                            thread_ts,
+                            format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", item, karma),
+                        )
+                    }
                 } else {
                     let re = Regex::new(REGEX_KARMA_MINUS).unwrap();
                     let cap = re.captures(trimmed_text).unwrap();
