@@ -13,6 +13,7 @@ use std::time::Duration;
 
 mod db;
 mod karma;
+mod slack;
 
 use karma::KarmaMessage;
 
@@ -151,31 +152,36 @@ where
                     user,
                     ..
                 } => {
-                    if let Some((reply_thread_ts, reply_message)) =
-                        karma::process_message(KarmaMessage {
-                            user,
-                            text,
-                            thread_ts,
-                            ts,
-                        })
-                        .await
-                    {
-                        let request = PostMessageRequest {
-                            channel: socket_mode
-                                .option_parameter
-                                .get("SLACK_CHANNEL_ID")
-                                .unwrap()
-                                .to_string(),
-                            thread_ts: Some(reply_thread_ts),
-                            text: Some(reply_message),
-                            ..Default::default()
-                        };
+                    if let Ok(user) = slack::users_info(&user).await {
+                        if let Some((reply_thread_ts, reply_message)) =
+                            karma::process_message(KarmaMessage {
+                                user,
+                                text,
+                                thread_ts,
+                                ts,
+                            })
+                            .await
+                        {
+                            let request = PostMessageRequest {
+                                channel: socket_mode
+                                    .option_parameter
+                                    .get("SLACK_CHANNEL_ID")
+                                    .unwrap()
+                                    .to_string(),
+                                thread_ts: Some(reply_thread_ts),
+                                text: Some(reply_message),
+                                ..Default::default()
+                            };
 
-                        let response =
-                            post_message(&socket_mode.api_client, &request, &socket_mode.bot_token)
-                                .await
-                                .expect("post message api error.");
-                        log::info!("post message api response: {:?}", response);
+                            let response = post_message(
+                                &socket_mode.api_client,
+                                &request,
+                                &socket_mode.bot_token,
+                            )
+                            .await
+                            .expect("post message api error.");
+                            log::info!("post message api response: {:?}", response);
+                        }
                     }
                 }
                 _ => {}

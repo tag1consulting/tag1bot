@@ -2,6 +2,7 @@ use regex::{Regex, RegexSet};
 use rusqlite::params;
 
 use crate::db::DB;
+use crate::slack::User;
 use crate::TAG1BOT_USER;
 
 const REGEX_KARMA_PLUS: &str = r"^(\w{1,20})\+\+$";
@@ -9,7 +10,7 @@ const REGEX_KARMA_MINUS: &str = r"^(\w{1,20})\-\-$";
 
 // Details needed to determine if a message modifies karma and to build a reply.
 pub(crate) struct KarmaMessage {
-    pub(crate) user: String,
+    pub(crate) user: User,
     pub(crate) text: String,
     pub(crate) thread_ts: Option<String>,
     pub(crate) ts: String,
@@ -74,7 +75,7 @@ pub(crate) fn decrement(text: &str) -> i32 {
 // Determine if Karma is being modified in this message. Returns `Some(thread id, message)` if karma
 // is modified, returns `None` if not,
 pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, String)> {
-    if message.user != TAG1BOT_USER {
+    if message.user.id != TAG1BOT_USER {
         let trimmed_text = message.text.trim();
         let set = RegexSet::new(&[REGEX_KARMA_PLUS, REGEX_KARMA_MINUS]).unwrap();
         if set.is_match(trimmed_text) {
@@ -91,7 +92,7 @@ pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, St
                 let cap = re.captures(trimmed_text).unwrap();
                 let item = cap.get(1).map_or("", |m| m.as_str());
                 // Only run karma if user is not self-incrementing.
-                if message.user.to_lowercase() != item.to_lowercase() {
+                if message.user.name.to_lowercase() != item.to_lowercase() {
                     let karma = increment(&item.to_lowercase());
                     format!("Karma for `{}` increased to {}.", item, karma)
                 } else {
