@@ -13,9 +13,12 @@ use std::time::Duration;
 
 mod db;
 mod karma;
+mod seen;
 mod slack;
+mod util;
 
 use karma::KarmaMessage;
+use seen::SeenMessage;
 
 #[macro_use]
 extern crate lazy_static;
@@ -148,21 +151,47 @@ where
                     user,
                     ..
                 } => {
-                    if let (Ok(user), Ok(_channel)) = (
+                    if let (Ok(user_object), Ok(channel_object)) = (
                         slack::users_info(&user).await,
                         slack::channels_info(&channel).await,
                     ) {
+                        let karma_message = KarmaMessage {
+                            user: user_object,
+                            text,
+                            thread_ts,
+                            ts,
+                        };
                         if let Some((reply_thread_ts, reply_message)) =
-                            karma::process_message(KarmaMessage {
-                                user,
-                                text,
-                                thread_ts,
-                                ts,
-                            })
-                            .await
+                            karma::process_message(&karma_message).await
                         {
                             let request = PostMessageRequest {
-                                channel,
+                                channel: channel.clone(),
+                                thread_ts: Some(reply_thread_ts),
+                                text: Some(reply_message),
+                                ..Default::default()
+                            };
+
+                            let response = post_message(
+                                &socket_mode.api_client,
+                                &request,
+                                &socket_mode.bot_token,
+                            )
+                            .await
+                            .expect("post message api error.");
+                            log::info!("post message api response: {:?}", response);
+                        }
+                        let seen_message = SeenMessage {
+                            user: karma_message.user,
+                            channel: channel_object,
+                            text: karma_message.text,
+                            thread_ts: karma_message.thread_ts,
+                            ts: karma_message.ts,
+                        };
+                        if let Some((reply_thread_ts, reply_message)) =
+                            seen::process_message(&seen_message).await
+                        {
+                            let request = PostMessageRequest {
+                                channel: channel.clone(),
                                 thread_ts: Some(reply_thread_ts),
                                 text: Some(reply_message),
                                 ..Default::default()

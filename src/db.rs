@@ -27,5 +27,21 @@ pub(crate) fn setup() {
     )
     .expect("failed to create karma table");
     db.execute("CREATE INDEX IF NOT EXISTS i_name ON karma (name)", [])
-        .expect("failed to create index i_name");
+        .expect("failed to create index karma.i_name");
+
+    // Create the seen table if it doesn't already exist.
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS seen (
+        id              INTEGER PRIMARY KEY,
+        channel         TEXT NOT NULL,
+        user            TEXT NOT NULL,
+        last_said       TEXT NOT NULL,
+        last_seen       INTEGER,
+        last_private    INTEGER
+            )",
+        [],
+    )
+    .expect("failed to create seen table");
+    db.execute("CREATE INDEX IF NOT EXISTS i_name ON seen (name)", [])
+        .expect("failed to create seen seen.i_name");
 }
