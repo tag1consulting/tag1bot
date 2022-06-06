@@ -5,7 +5,7 @@ use crate::db::DB;
 use crate::slack::{Channel, User};
 use crate::util;
 
-const REGEX_SEEN: &str = r"^seen (\w{1,42})\?$";
+const REGEX_SEEN: &str = r"(?i)^seen (\w{1,42})\?$";
 
 // Details needed to track when a user was last seen.
 #[derive(Debug)]
@@ -31,6 +31,7 @@ pub(crate) struct LastSeen {
 pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, String)> {
     let trimmed_text = message.text.trim();
 
+    // Check if someone is asking `seen <foo>?`.
     let re = Regex::new(REGEX_SEEN).expect("failed to compile REGEX_SEEN");
     let seen_request = if re.is_match(trimmed_text) {
         let cap = re
@@ -41,18 +42,27 @@ pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, St
         ""
     };
 
-    let last_seen = if seen_request.is_empty() {
+    // And if so, get the answer.
+    let requested_user_last_seen = if seen_request.is_empty() {
         None
     } else {
-        seen(seen_request)
+        last_seen(seen_request)
     };
 
-    record_seen(message, message.channel.is_private, last_seen.is_some());
+    // Either way, record that we're seeing a user message now.
+    let current_user_last_seen = last_seen(&message.user.name);
+    record_seen(
+        message,
+        message.channel.is_private,
+        current_user_last_seen.is_some(),
+    );
 
+    // Prepare a reply, if someone asked `seen <foo>?`.
     let reply_message = if seen_request.is_empty() {
+        // Do not send a reply.
         return None;
     } else {
-        if let Some(last_seen) = last_seen {
+        if let Some(last_seen) = requested_user_last_seen {
             format!(
                 "{} last seen in #{} saying '{}' {}.`",
                 last_seen.user,
@@ -61,7 +71,7 @@ pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, St
                 util::time_ago(last_seen.last_seen as u64, false)
             )
         } else {
-            format!("I have never seen `{}`.", message.user.name)
+            format!("I've never seen `{}`.", seen_request)
         }
     };
 
@@ -76,7 +86,7 @@ pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, St
 }
 
 // Determine when a given user was last seen.
-fn seen(user: &str) -> Option<LastSeen> {
+fn last_seen(user: &str) -> Option<LastSeen> {
     let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
     let mut statement = db
         .prepare(
