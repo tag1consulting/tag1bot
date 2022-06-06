@@ -64,7 +64,7 @@ pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, St
     } else {
         if let Some(last_seen) = requested_user_last_seen {
             format!(
-                "{} last seen in #{} saying '{}' {}.`",
+                "`{}` last seen in `#{}` saying '`{}`' {}.",
                 last_seen.user,
                 last_seen.channel,
                 last_seen.last_said,
