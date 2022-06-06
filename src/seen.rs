@@ -90,7 +90,8 @@ fn last_seen(user: &str) -> Option<LastSeen> {
     let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
     let mut statement = db
         .prepare(
-            "SELECT user, channel, last_said, last_seen, last_private FROM seen WHERE user = :user",
+            //"SELECT user, channel, last_said, last_seen, last_private FROM seen WHERE user = :user",
+            "SELECT user, channel, last_said, last_seen FROM seen WHERE user = :user",
         )
         .expect("failed to prepare SELECT");
     let mut seen_iter = statement
@@ -154,8 +155,8 @@ fn record_seen(seen_message: &SeenMessage, is_private: bool, previously_seen: bo
                 "INSERT INTO seen (user, last_said, channel, last_seen) VALUES(?1, ?2, ?3, ?4)",
                 params![
                     seen_message.user.name.to_lowercase(),
-                    seen_message.channel.name,
                     seen_message.text,
+                    seen_message.channel.name,
                     util::timestamp_now(),
                 ],
             )
