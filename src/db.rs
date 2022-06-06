@@ -14,7 +14,7 @@ lazy_static! {
 
 // Create all tables and indexes at startup.
 pub(crate) fn setup() {
-    let db = DB.lock().unwrap();
+    let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
 
     // Create the karma table if it doesn't already exist.
     db.execute(

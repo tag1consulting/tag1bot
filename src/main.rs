@@ -115,7 +115,7 @@ where
             Event::EventCallback(event_callback) => match event_callback.event {
                 EventCallbackType::AppMention {
                     //text,
-                    //channel,
+                    channel,
                     ts,
                     thread_ts,
                     ..
@@ -127,11 +127,7 @@ where
                     };
 
                     let request = PostMessageRequest {
-                        channel: socket_mode
-                            .option_parameter
-                            .get("SLACK_CHANNEL_ID")
-                            .unwrap()
-                            .to_string(),
+                        channel,
                         thread_ts: Some(reply_thread_ts),
                         text: Some(reply_text),
                         ..Default::default()
@@ -144,15 +140,18 @@ where
                 }
                 EventCallbackType::Message {
                     //channel_type,
-                    //channel,
                     //event_ts,
+                    channel,
                     text,
                     thread_ts,
                     ts,
                     user,
                     ..
                 } => {
-                    if let Ok(user) = slack::users_info(&user).await {
+                    if let (Ok(user), Ok(_channel)) = (
+                        slack::users_info(&user).await,
+                        slack::channels_info(&channel).await,
+                    ) {
                         if let Some((reply_thread_ts, reply_message)) =
                             karma::process_message(KarmaMessage {
                                 user,
@@ -163,11 +162,7 @@ where
                             .await
                         {
                             let request = PostMessageRequest {
-                                channel: socket_mode
-                                    .option_parameter
-                                    .get("SLACK_CHANNEL_ID")
-                                    .unwrap()
-                                    .to_string(),
+                                channel,
                                 thread_ts: Some(reply_thread_ts),
                                 text: Some(reply_message),
                                 ..Default::default()

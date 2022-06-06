@@ -5,8 +5,8 @@ use crate::db::DB;
 use crate::slack::User;
 use crate::TAG1BOT_USER;
 
-const REGEX_KARMA_PLUS: &str = r"^(\w{1,20})\+\+$";
-const REGEX_KARMA_MINUS: &str = r"^(\w{1,20})\-\-$";
+const REGEX_KARMA_PLUS: &str = r"^(\w{2,20})\+\+$";
+const REGEX_KARMA_MINUS: &str = r"^(\w{2,20})\-\-$";
 
 // Details needed to determine if a message modifies karma and to build a reply.
 pub(crate) struct KarmaMessage {
@@ -18,7 +18,7 @@ pub(crate) struct KarmaMessage {
 
 // Increment karma by 1 for given `text`.
 pub(crate) fn increment(text: &str) -> i32 {
-    let db = DB.lock().unwrap();
+    let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
     db.execute(
         "UPDATE karma SET counter = counter + 1 WHERE name = ?1",
         params![text],
@@ -46,7 +46,7 @@ pub(crate) fn increment(text: &str) -> i32 {
 
 // Decrement karma by 1 for given `text`.
 pub(crate) fn decrement(text: &str) -> i32 {
-    let db = DB.lock().unwrap();
+    let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
     db.execute(
         "UPDATE karma SET counter = counter - 1 WHERE name = ?1",
         params![text],
@@ -77,7 +77,8 @@ pub(crate) fn decrement(text: &str) -> i32 {
 pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, String)> {
     if message.user.id != TAG1BOT_USER {
         let trimmed_text = message.text.trim();
-        let set = RegexSet::new(&[REGEX_KARMA_PLUS, REGEX_KARMA_MINUS]).unwrap();
+        let set = RegexSet::new(&[REGEX_KARMA_PLUS, REGEX_KARMA_MINUS])
+            .expect("failed to build RegexSet");
         if set.is_match(trimmed_text) {
             // Always reply in a thread: determine if reply is in a new thread or an existing thread.
             let reply_thread_ts = if let Some(thread_ts) = message.thread_ts {
@@ -88,8 +89,10 @@ pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, St
             let matches: Vec<_> = set.matches(trimmed_text).into_iter().collect();
             let set_match = matches[0];
             let reply_message = if set_match == 0 {
-                let re = Regex::new(REGEX_KARMA_PLUS).unwrap();
-                let cap = re.captures(trimmed_text).unwrap();
+                let re = Regex::new(REGEX_KARMA_PLUS).expect("failed to compile REGEX_KARMA_PLUS");
+                let cap = re
+                    .captures(trimmed_text)
+                    .expect("failed to capture REGEX_KARMA_PLUS");
                 let item = cap.get(1).map_or("", |m| m.as_str());
                 // Only run karma if user is not self-incrementing.
                 if message.user.name.to_lowercase() != item.to_lowercase() {
@@ -100,8 +103,11 @@ pub(crate) async fn process_message(message: KarmaMessage) -> Option<(String, St
                     format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", item, karma)
                 }
             } else {
-                let re = Regex::new(REGEX_KARMA_MINUS).unwrap();
-                let cap = re.captures(trimmed_text).unwrap();
+                let re =
+                    Regex::new(REGEX_KARMA_MINUS).expect("failed to compile REGEX_KARMA_MINUS");
+                let cap = re
+                    .captures(trimmed_text)
+                    .expect("failed to capture REGEX_KARMA_MINUS");
                 let item = cap.get(1).map_or("", |m| m.as_str());
                 let karma = decrement(&item.to_lowercase());
                 format!("Karma for `{}` decreased to {}.", item, karma)
