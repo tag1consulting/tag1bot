@@ -104,18 +104,33 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
         )),
     };
 
+    // The API seems to invert the conversion formula when converting to/from BTC.
+    let is_btc = from_currency.to_uppercase() == "BTC" || to_currency.to_uppercase() == "BTC";
+
     // Perform the conversion.
     let rounded_value = if conversion_rate > 0.01 {
         // Round to the nearest 2 decimal points.
-        let converted_value: f32 = amount * conversion_rate * 100.0;
+        let converted_value = if is_btc {
+            amount / conversion_rate * 100.0
+        } else {
+            amount * conversion_rate * 100.0
+        };
         converted_value.round() / 100.0
     } else if conversion_rate > 0.05 {
         // Round to the nearest 5 decimal points.
-        let converted_value: f32 = amount * conversion_rate * 100000.0;
+        let converted_value = if is_btc {
+            amount / conversion_rate * 100000.0
+        } else {
+            amount * conversion_rate * 100000.0
+        };
         converted_value.round() / 100000.0
     } else {
         // Don't round.
-        amount * conversion_rate
+        if is_btc {
+            amount / conversion_rate
+        } else {
+            amount * conversion_rate
+        }
     };
     let reply_message = format!(
         "{} {} is currently {} {}.",
