@@ -127,7 +127,7 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
 
     let reply_message = format!(
         "{} {} is currently {} {}.",
-        amount, from_currency, rounded, to_currency
+        amount, from_currency.to_uppercase(), rounded, to_currency.to_uppercase()
     );
 
     Some((reply_thread_ts, reply_message))
