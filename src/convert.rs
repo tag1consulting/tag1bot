@@ -4,7 +4,7 @@ use std::env;
 use crate::util;
 
 const REGEX_CONVERT: &str =
-    r"(?i)^convert (from )?([0-9]*(\.[0-9]*)?( )?){1}([a-z]{3}) (to )?([a-z]{3})$";
+    r"(?i)^convert (from )?([0-9]*(\.[0-9]*)?( )?){1}([a-z]{3,4}) (to )?([a-z]{3,4})$";
 
 const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
 
@@ -102,10 +102,16 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
     let converted_json = &parsed_response["to"][0]["mid"];
     let converted: f32 = match converted_json.as_f32() {
         Some(c) => c,
-        None => return Some((
-            reply_thread_ts,
-            format!("Sorry, I failed to convert the response ({}) from the ConversionAPI (`json::as_f32` error)", converted_json)
-        )),
+        None => {
+            return Some((
+                reply_thread_ts,
+                format!(
+                    "{} and/or {} unknown, failed to convert.",
+                    from_currency.to_uppercase(),
+                    to_currency.to_uppercase()
+                ),
+            ))
+        }
     };
 
     let rounded = if converted > 100.0 {
@@ -127,7 +133,10 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
 
     let reply_message = format!(
         "{} {} is currently {} {}.",
-        amount, from_currency.to_uppercase(), rounded, to_currency.to_uppercase()
+        amount,
+        from_currency.to_uppercase(),
+        rounded,
+        to_currency.to_uppercase()
     );
 
     Some((reply_thread_ts, reply_message))
