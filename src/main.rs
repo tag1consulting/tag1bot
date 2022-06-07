@@ -11,12 +11,14 @@ use slack_rust::socket::socket_mode::{ack, EventHandler, SocketMode, Stream};
 use std::env;
 use std::time::Duration;
 
+mod convert;
 mod db;
 mod karma;
 mod seen;
 mod slack;
 mod util;
 
+use convert::ConvertMessage;
 use karma::KarmaMessage;
 use seen::SeenMessage;
 
@@ -44,6 +46,13 @@ async fn main() {
         .unwrap_or_else(|_| panic!("slack bot token is not set (starts with 'xoxb')."));
     let slack_channel_id =
         env::var("SLACK_CHANNEL_ID").unwrap_or_else(|_| panic!("slack channel id is not set."));
+
+    let _enable_currency = if env::var("CURRENCY_API_KEY").is_ok() {
+        true
+    } else {
+        log::warn!("CURRENCY_API_KEY not set, disabling currency conversion.");
+        false
+    };
 
     let api_client = default_client();
 
@@ -155,6 +164,7 @@ where
                         slack::users_info(&user).await,
                         slack::channels_info(&channel).await,
                     ) {
+                        // Process message for karma.
                         let karma_message = KarmaMessage {
                             user: user_object,
                             text,
@@ -180,6 +190,7 @@ where
                             .expect("post message api error.");
                             log::info!("post message api response: {:?}", response);
                         }
+                        // Process message for seen.
                         let seen_message = SeenMessage {
                             user: karma_message.user,
                             channel: channel_object,
@@ -205,6 +216,33 @@ where
                             .await
                             .expect("post message api error.");
                             log::info!("post message api response: {:?}", response);
+                        }
+                        // Process message for convert if CURRENCY_API_KEY is set.
+                        if env::var("CURRENCY_API_KEY").is_ok() {
+                            let convert_message = ConvertMessage {
+                                text: seen_message.text,
+                                thread_ts: seen_message.thread_ts,
+                                ts: seen_message.ts,
+                            };
+                            if let Some((reply_thread_ts, reply_message)) =
+                                convert::process_message(&convert_message).await
+                            {
+                                let request = PostMessageRequest {
+                                    channel: channel.clone(),
+                                    thread_ts: Some(reply_thread_ts),
+                                    text: Some(reply_message),
+                                    ..Default::default()
+                                };
+
+                                let response = post_message(
+                                    &socket_mode.api_client,
+                                    &request,
+                                    &socket_mode.bot_token,
+                                )
+                                .await
+                                .expect("post message api error.");
+                                log::info!("post message api response: {:?}", response);
+                            }
                         }
                     }
                 }

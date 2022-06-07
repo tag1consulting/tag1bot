@@ -12,6 +12,12 @@ The bot increases karma for `foo++`-style commands, and decreases karma for `foo
 
 The bot records the last message per user posted to any public channel it is in, and responds to `seen foo?` with the details.
 
+## Convert
+
+The bot recognizes "convert # FOO to BAR" style requests. For example, "convert 1 BTC to USD" or "convert 100 USD to EUR".
+
+This feature requires that you set up an account on https://currencyapi.com/ and configure the `CURRENCY_API_KEY` environment variable when starting the bot.
+
 # How To Use
 
 First, register a new bot in your workspace by clicking `Create New App` at https://api.slack.com/apps. Create from scratch. You can name your bot whatever you want, `Tag1bot`, `Sea Cow`, `Druplicon`, whatever you prefer!

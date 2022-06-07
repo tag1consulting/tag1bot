@@ -925,6 +925,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "json"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
+
+[[package]]
 name = "kv-log-macro"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1646,11 +1652,12 @@ dependencies = [
 
 [[package]]
 name = "tag1bot"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-std",
  "async-trait",
  "env_logger",
+ "json",
  "lazy_static",
  "log",
  "rand 0.8.5",
