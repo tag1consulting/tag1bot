@@ -1,5 +1,15 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// Basic auth is a "username:password" secret that is base64 encoded.
+// What is returned must be set in an `Authorization` header, ie:
+//   .header("Authorization", util::generate_basic_auth("username:password"))
+pub(crate) fn generate_basic_auth(username: &str, password: &str) -> String {
+    format!(
+        "Basic {}",
+        base64::encode(format!("{}:{}", username, password))
+    )
+}
+
 // Get the time since the unix epoch.
 pub fn timestamp_now() -> u64 {
     let start = SystemTime::now();

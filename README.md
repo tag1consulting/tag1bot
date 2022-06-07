@@ -16,7 +16,7 @@ The bot records the last message per user posted to any public channel it is in,
 
 The bot recognizes "convert # FOO to BAR" style requests. For example, "convert 1 BTC to USD" or "convert 100 USD to EUR".
 
-This feature requires that you set up an account on https://currencyapi.com/ and configure the `CURRENCY_API_KEY` environment variable when starting the bot.
+This feature requires that you set up an account on https://www.xe.com/xecurrencydata/ and configure the `XE_ACCOUNT_ID` and `XE_API_KEY` environment variables when starting the bot.
 
 # How To Use
 

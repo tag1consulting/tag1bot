@@ -1,10 +1,12 @@
 use regex::Regex;
 use std::env;
 
+use crate::util;
+
 const REGEX_CONVERT: &str =
     r"(?i)^convert (from )?([0-9]*(\.[0-9]*)?( )?){1}([a-z]{3}) (to )?([a-z]{3})$";
 
-const CURRENCY_API: &str = "https://api.currencyapi.com/v3/latest";
+const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
 
 // Details needed to determine if a message modifies karma and to build a reply.
 pub(crate) struct ConvertMessage {
@@ -44,14 +46,16 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
     };
 
     // Use CurrencyAPI to perform actual conversion.
+    let id = env::var("XE_ACCOUNT_ID").unwrap_or_else(|_| panic!("XE_ACCOUNT_ID is not set."));
+    let key = env::var("XE_API_KEY").unwrap_or_else(|_| panic!("XE_API_KEY is not set."));
     let response = match match surf::get(format!(
-        "{}?base_currency={}&currencies={}",
-        CURRENCY_API, from_currency.to_uppercase(), to_currency.to_uppercase()
+        "{}?from={}&to={}&amount={}&crypto=true",
+        CURRENCY_API,
+        from_currency.to_uppercase(),
+        to_currency.to_uppercase(),
+        amount
     ))
-    .header(
-        "apikey",
-        env::var("CURRENCY_API_KEY").expect("CURRENCY_API_KEY vanished!?"),
-    )
+    .header("Authorization", util::generate_basic_auth(&id, &key))
     .await
     {
         Ok(r) => r,
@@ -62,7 +66,7 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
                     "Sorry, my request to the ConversionAPI failed (`surf::get()`): {}",
                     e
                 ),
-            ))
+            ));
         }
     }
     .body_string()
@@ -76,7 +80,7 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
                     "Sorry, my request to the ConversionAPI failed (`surf::body_string()`): {}",
                     e
                 ),
-            ))
+            ));
         }
     };
 
@@ -95,46 +99,35 @@ pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String,
     };
 
     // Extract the conversion rate from the parsed JSON.
-    let conversion_rate_json = &parsed_response["data"][to_currency.to_uppercase()]["value"];
-    let conversion_rate: f32 = match conversion_rate_json.as_f32() {
+    let converted_json = &parsed_response["to"][0]["mid"];
+    let converted: f32 = match converted_json.as_f32() {
         Some(c) => c,
         None => return Some((
             reply_thread_ts,
-            format!("Sorry, I failed to convert the response ({}) from the ConversionAPI (`json::as_f32` error)", conversion_rate_json)
+            format!("Sorry, I failed to convert the response ({}) from the ConversionAPI (`json::as_f32` error)", converted_json)
         )),
     };
 
-    // The API seems to invert the conversion formula when converting to/from BTC.
-    let is_btc = from_currency.to_uppercase() == "BTC" || to_currency.to_uppercase() == "BTC";
-
-    // Perform the conversion.
-    let rounded_value = if conversion_rate > 0.01 {
-        // Round to the nearest 2 decimal points.
-        let converted_value = if is_btc {
-            amount / conversion_rate * 100.0
-        } else {
-            amount * conversion_rate * 100.0
-        };
-        converted_value.round() / 100.0
-    } else if conversion_rate > 0.05 {
-        // Round to the nearest 5 decimal points.
-        let converted_value = if is_btc {
-            amount / conversion_rate * 100000.0
-        } else {
-            amount * conversion_rate * 100000.0
-        };
-        converted_value.round() / 100000.0
+    let rounded = if converted > 100.0 {
+        // For values greater than 100.0, round to two decimals.
+        let to_round = converted * 100.0;
+        to_round.round() / 100.0
+    } else if converted > 0.1 {
+        // For values greater than 0.1, round to three decimals.
+        let to_round = converted * 1000.0;
+        to_round.round() / 1000.0
+    } else if converted > 0.000001 {
+        // For values greater than 0.000001, round to six decimals.
+        let to_round = converted * 1000000.0;
+        to_round.round() / 1000000.0
     } else {
-        // Don't round.
-        if is_btc {
-            amount / conversion_rate
-        } else {
-            amount * conversion_rate
-        }
+        // For very small values, don't round.
+        converted
     };
+
     let reply_message = format!(
         "{} {} is currently {} {}.",
-        amount, from_currency, rounded_value, to_currency
+        amount, from_currency, rounded, to_currency
     );
 
     Some((reply_thread_ts, reply_message))

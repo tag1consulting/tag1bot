@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.51"
 async-std = { version = "1.10.0", features = ["attributes"] }
+base64 = "0.13"
 env_logger = "0.8.4"
 json = "0.12"
 lazy_static = "1.4"
