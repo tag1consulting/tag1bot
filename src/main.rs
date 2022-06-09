@@ -47,7 +47,7 @@ async fn main() {
     let slack_channel_id =
         env::var("SLACK_CHANNEL_ID").unwrap_or_else(|_| panic!("slack channel id is not set."));
 
-    let _enable_currency = if env::var("XE_ACCOUNT_ID").is_ok() && env::var("XE_API_KEY").is_ok() {
+    let enable_currency = if env::var("XE_ACCOUNT_ID").is_ok() && env::var("XE_API_KEY").is_ok() {
         true
     } else {
         log::warn!("XE_ACCOUNT_ID or XE_API_KEY not set, disabling currency conversion.");
@@ -58,6 +58,14 @@ async fn main() {
 
     // Be sure all required tables and indexes exist.
     db::setup();
+
+    // If currency conversions is enabled, start the alert thread.
+    if enable_currency {
+        task::spawn(async {
+            convert::alert_thread().await;
+        })
+        .await;
+    }
 
     // Restart if the bot crashes.
     loop {
@@ -220,6 +228,8 @@ where
                         // Process message for convert if api id and key are set.
                         if env::var("XE_ACCOUNT_ID").is_ok() && env::var("XE_API_KEY").is_ok() {
                             let convert_message = ConvertMessage {
+                                channel_id: channel.clone(),
+                                username: seen_message.user.name.clone(),
                                 text: seen_message.text,
                                 thread_ts: seen_message.thread_ts,
                                 ts: seen_message.ts,
