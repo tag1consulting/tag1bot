@@ -44,4 +44,20 @@ pub(crate) fn setup() {
     .expect("failed to create seen table");
     db.execute("CREATE INDEX IF NOT EXISTS i_name ON seen (name)", [])
         .expect("failed to create seen seen.i_name");
+
+    // Create the currency_alert table if it doesn't already exist.
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS currency_alert (
+        id              INTEGER PRIMARY KEY,
+        channel         TEXT NOT NULL,
+        user            TEXT NOT NULL,
+        from_currency   TEXT NOT NULL,
+        from_amount     REAL,
+        comparison      TEXT NOT NULL,
+        to_currency     TEXT NOT NULL,
+        to_amount       REAL
+            )",
+        [],
+    )
+    .expect("failed to create currency_alert table");
 }

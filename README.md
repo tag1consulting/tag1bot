@@ -14,9 +14,11 @@ The bot records the last message per user posted to any public channel it is in,
 
 ## Convert
 
-The bot recognizes "convert # FOO to BAR" style requests. For example, "convert 1 BTC to USD" or "convert 100 USD to EUR".
+The bot recognizes "convert # FOO to BAR" style requests. For example, `convert 1 BTC to USD` or `convert 100 USD to EUR`.
 
-This feature requires that you set up an account on https://www.xe.com/xecurrencydata/ and configure the `XE_ACCOUNT_ID` and `XE_API_KEY` environment variables when starting the bot.
+The bot also recognizes "alert me when # FOO is [greater|less] # bar" style requests. For example `alert me when 1 USD is greater than .95 EUR`, or `alert when BTC is less than 20000 USD`. Alerts will be delivered in the channel the alert was configured in.
+
+The convert features require that you set up an account on https://www.xe.com/xecurrencydata/ and configure the `XE_ACCOUNT_ID` and `XE_API_KEY` environment variables when starting the bot.
 
 # How To Use
 
