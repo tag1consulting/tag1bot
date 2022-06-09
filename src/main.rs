@@ -63,8 +63,7 @@ async fn main() {
     if enable_currency {
         task::spawn(async {
             convert::alert_thread().await;
-        })
-        .await;
+        });
     }
 
     // Restart if the bot crashes.
