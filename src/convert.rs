@@ -9,8 +9,8 @@ use crate::util;
 
 const REGEX_CONVERT: &str =
     r"(?i)^convert (from )?([0-9]*(\.[0-9]*)?( )?){1}([a-z]{3,4}) (to )?([a-z]{3,4})$";
-const REGEX_ALERT_GREATER: &str = r"(?i)^alert(?:\s)*(me|all|everyone)?(?:\s)*(?:when|if)?(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})(?:\s)*(?:is)?(?:\s)*(?:greater|greater than|greater then|gt|>|more|more than|more then)(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})$";
-const REGEX_ALERT_LESSER: &str = r"(?i)^alert(?:\s)*(me|all|everyone)?(?:\s)*(?:when|if)?(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})(?:\s)*(?:is)?(?:\s)*(?:lesser|less|lesser than|less than|lesser then|less than|lt|<)(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})$";
+const REGEX_ALERT_GREATER: &str = r"(?i)^(?:alert|notify|tell|ping)(?:\s)*(me|all|everyone)?(?:\s)*(?:when|if)?(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})(?:\s)*(?:is)?(?:\s)*(?:greater|greater than|greater then|gt|>|more|more than|more then)(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})*$";
+const REGEX_ALERT_LESSER: &str = r"(?i)^(?:alert|notify|tell|ping)(?:\s)*(me|all|everyone)?(?:\s)*(?:when|if)?(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})(?:\s)*(?:is)?(?:\s)*(?:lesser|less|lesser than|less than|lesser then|less than|lt|<)(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})*$";
 
 const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
 
