@@ -1,3 +1,5 @@
+// Functions for creating, updating and sharing the sqlite database.
+
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 

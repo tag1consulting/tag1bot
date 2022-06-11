@@ -1,21 +1,14 @@
+// Tracks when each user was last seen.
+// For example, `seen nnewton?` or `seen peta`.
+
 use regex::Regex;
 use rusqlite::params;
 
 use crate::db::DB;
-use crate::slack::{Channel, User};
+use crate::slack;
 use crate::util;
 
-const REGEX_SEEN: &str = r"(?i)^seen (\w{1,42})\?$";
-
-// Details needed to track when a user was last seen.
-#[derive(Debug)]
-pub(crate) struct SeenMessage {
-    pub(crate) user: User,
-    pub(crate) channel: Channel,
-    pub(crate) text: String,
-    pub(crate) thread_ts: Option<String>,
-    pub(crate) ts: String,
-}
+const REGEX_SEEN: &str = r"(?i)^seen (\w{1,42})(?:\?)?$";
 
 // When a user was last seen, and what they said (if in a non-private channel).
 #[derive(Debug)]
@@ -28,7 +21,7 @@ pub(crate) struct LastSeen {
 }
 
 // Update last_seen for user posting message, reply if they're asking `seen displayname?`.
-pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, String)> {
+pub(crate) async fn process_message(message: &slack::Message) -> Option<(String, String)> {
     let trimmed_text = message.text.trim();
 
     // Check if someone is asking `seen <foo>?`.
@@ -61,18 +54,16 @@ pub(crate) async fn process_message(message: &SeenMessage) -> Option<(String, St
     let reply_message = if seen_request.is_empty() {
         // Do not send a reply.
         return None;
+    } else if let Some(last_seen) = requested_user_last_seen {
+        format!(
+            "`{}` last seen in `#{}` saying `{}` {}.",
+            last_seen.user,
+            last_seen.channel,
+            last_seen.last_said,
+            util::time_ago(last_seen.last_seen as u64, false)
+        )
     } else {
-        if let Some(last_seen) = requested_user_last_seen {
-            format!(
-                "`{}` last seen in `#{}` saying '`{}`' {}.",
-                last_seen.user,
-                last_seen.channel,
-                last_seen.last_said,
-                util::time_ago(last_seen.last_seen as u64, false)
-            )
-        } else {
-            format!("I've never seen `{}`.", seen_request)
-        }
+        format!("I've never seen `{}`.", seen_request)
     };
 
     // Always reply in a thread: determine if reply is in a new thread or an existing thread.
@@ -114,34 +105,38 @@ fn last_seen(user: &str) -> Option<LastSeen> {
 }
 
 // Create/update record for last_seen for current user.
-fn record_seen(seen_message: &SeenMessage, is_private: bool, previously_seen: bool) {
+fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen: bool) {
     let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
 
-    if previously_seen {
-        if is_private {
-            // Only record timestamp if seeing user in a private channel.
-            db.execute(
-                "UPDATE seen SET last_private = ?1 WHERE user = ?2",
-                params![util::timestamp_now(), seen_message.user.name.to_lowercase()],
-            )
-            .expect("failed to update seen");
-        } else {
-            // Record full information if seeing user in a public channel.
-            db.execute(
-                "UPDATE seen SET channel = ?1, last_said = ?2, last_seen = ?3 WHERE user = ?4",
-                params![
-                    seen_message.channel.name,
-                    seen_message.text,
-                    util::timestamp_now(),
-                    seen_message.user.name.to_lowercase()
-                ],
-            )
-            .expect("failed to update seen");
+    match previously_seen {
+        // The user has previously been seen, update their record with their latest message.
+        true => {
+            if is_private {
+                // Only record timestamp if seeing user in a private channel.
+                db.execute(
+                    "UPDATE seen SET last_private = ?1 WHERE user = ?2",
+                    params![util::timestamp_now(), seen_message.user.name.to_lowercase()],
+                )
+                .expect("failed to update seen");
+            } else {
+                // Record full information if seeing user in a public channel.
+                db.execute(
+                    "UPDATE seen SET channel = ?1, last_said = ?2, last_seen = ?3 WHERE user = ?4",
+                    params![
+                        seen_message.channel.name,
+                        seen_message.text,
+                        util::timestamp_now(),
+                        seen_message.user.name.to_lowercase()
+                    ],
+                )
+                .expect("failed to update seen");
+            }
         }
-    } else {
-        if is_private {
-            // Only record name and timestamp if seeing user in a private channel.
-            db.execute(
+        // The user has not been previously seen, create a new record with their first message.
+        false => {
+            if is_private {
+                // Only record name and timestamp if seeing user in a private channel.
+                db.execute(
                 r#"INSERT INTO seen (user, last_said, channel, last_seen, last_private) VALUES(?1, "", "", 0, ?2)"#,
                 params![
                     seen_message.user.name.to_lowercase(),
@@ -149,18 +144,19 @@ fn record_seen(seen_message: &SeenMessage, is_private: bool, previously_seen: bo
                 ],
             )
             .expect("failed to insert into seen");
-        } else {
-            // Record full information if seeing user in a public channel.
-            db.execute(
-                "INSERT INTO seen (user, last_said, channel, last_seen) VALUES(?1, ?2, ?3, ?4)",
-                params![
-                    seen_message.user.name.to_lowercase(),
-                    seen_message.text,
-                    seen_message.channel.name,
-                    util::timestamp_now(),
-                ],
-            )
-            .expect("failed to insert into seen");
+            } else {
+                // Record full information if seeing user in a public channel.
+                db.execute(
+                    "INSERT INTO seen (user, last_said, channel, last_seen) VALUES(?1, ?2, ?3, ?4)",
+                    params![
+                        seen_message.user.name.to_lowercase(),
+                        seen_message.text,
+                        seen_message.channel.name,
+                        util::timestamp_now(),
+                    ],
+                )
+                .expect("failed to insert into seen");
+            }
         }
     }
 }
