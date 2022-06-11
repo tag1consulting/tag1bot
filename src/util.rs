@@ -1,3 +1,5 @@
+// General utility functions.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // Basic auth is a "username:password" secret that is base64 encoded.

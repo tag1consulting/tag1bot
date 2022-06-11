@@ -1,24 +1,19 @@
+// Tracks keyword karma.
+// For example, `foo++` or `bar--`.
+
 use regex::{Regex, RegexSet};
 use rusqlite::params;
 
 use crate::db::DB;
-use crate::slack::User;
+use crate::slack;
 use crate::TAG1BOT_USER;
 
 const REGEX_KARMA_PLUS: &str = r"^(\w{2,20})\+\+$";
 const REGEX_KARMA_MINUS: &str = r"^(\w{2,20})\-\-$";
 
-// Details needed to determine if a message modifies karma and to build a reply.
-pub(crate) struct KarmaMessage {
-    pub(crate) user: User,
-    pub(crate) text: String,
-    pub(crate) thread_ts: Option<String>,
-    pub(crate) ts: String,
-}
-
 // Determine if Karma is being modified in this message. Returns `Some(thread id, message)` if karma
 // is modified, returns `None` if not,
-pub(crate) async fn process_message(message: &KarmaMessage) -> Option<(String, String)> {
+pub(crate) async fn process_message(message: &slack::Message) -> Option<(String, String)> {
     if message.user.id != TAG1BOT_USER {
         let trimmed_text = message.text.trim();
         let set = RegexSet::new(&[REGEX_KARMA_PLUS, REGEX_KARMA_MINUS])

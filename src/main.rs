@@ -2,7 +2,6 @@ use async_std::task;
 use async_trait::async_trait;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde::{Deserialize, Serialize};
 use slack_rust::chat::post_message::{post_message, PostMessageRequest};
 use slack_rust::event_api::event::{Event, EventCallbackType};
 use slack_rust::http_client::{default_client, SlackWebAPIClient};
@@ -18,10 +17,6 @@ mod seen;
 mod slack;
 mod util;
 
-use convert::ConvertMessage;
-use karma::KarmaMessage;
-use seen::SeenMessage;
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -30,11 +25,6 @@ extern crate lazy_static;
 
 // @TODO: Get this on the fly?
 const TAG1BOT_USER: &str = "U03HT8ALNF4";
-
-#[derive(Deserialize, Serialize)]
-struct SlackMessage {
-    text: String,
-}
 
 #[async_std::main]
 async fn main() {
@@ -171,86 +161,45 @@ where
                         slack::users_info(&user).await,
                         slack::channels_info(&channel).await,
                     ) {
-                        // Process message for karma.
-                        let karma_message = KarmaMessage {
-                            user: user_object,
-                            text,
-                            thread_ts,
-                            ts,
-                        };
+                        // The latest message received from Slack.
+                        let message =
+                            slack::Message::new(channel_object, user_object, text, thread_ts, ts);
+                        // Process the message for karma.
                         if let Some((reply_thread_ts, reply_message)) =
-                            karma::process_message(&karma_message).await
+                            karma::process_message(&message).await
                         {
-                            let request = PostMessageRequest {
-                                channel: channel.clone(),
-                                thread_ts: Some(reply_thread_ts),
-                                text: Some(reply_message),
-                                ..Default::default()
-                            };
-
-                            let response = post_message(
-                                &socket_mode.api_client,
-                                &request,
-                                &socket_mode.bot_token,
+                            slack::reply_in_thread(
+                                socket_mode,
+                                &message,
+                                reply_thread_ts,
+                                reply_message,
                             )
-                            .await
-                            .expect("post message api error.");
-                            log::info!("post message api response: {:?}", response);
+                            .await;
                         }
-                        // Process message for seen.
-                        let seen_message = SeenMessage {
-                            user: karma_message.user,
-                            channel: channel_object,
-                            text: karma_message.text,
-                            thread_ts: karma_message.thread_ts,
-                            ts: karma_message.ts,
-                        };
+                        // Process the message for seen.
                         if let Some((reply_thread_ts, reply_message)) =
-                            seen::process_message(&seen_message).await
+                            seen::process_message(&message).await
                         {
-                            let request = PostMessageRequest {
-                                channel: channel.clone(),
-                                thread_ts: Some(reply_thread_ts),
-                                text: Some(reply_message),
-                                ..Default::default()
-                            };
-
-                            let response = post_message(
-                                &socket_mode.api_client,
-                                &request,
-                                &socket_mode.bot_token,
+                            slack::reply_in_thread(
+                                socket_mode,
+                                &message,
+                                reply_thread_ts,
+                                reply_message,
                             )
-                            .await
-                            .expect("post message api error.");
-                            log::info!("post message api response: {:?}", response);
+                            .await;
                         }
-                        // Process message for convert if api id and key are set.
+                        // If enabled, process the message for convert.
                         if env::var("XE_ACCOUNT_ID").is_ok() && env::var("XE_API_KEY").is_ok() {
-                            let convert_message = ConvertMessage {
-                                channel_id: channel.clone(),
-                                username: seen_message.user.name.clone(),
-                                text: seen_message.text,
-                                thread_ts: seen_message.thread_ts,
-                                ts: seen_message.ts,
-                            };
                             if let Some((reply_thread_ts, reply_message)) =
-                                convert::process_message(&convert_message).await
+                                convert::process_message(&message).await
                             {
-                                let request = PostMessageRequest {
-                                    channel: channel.clone(),
-                                    thread_ts: Some(reply_thread_ts),
-                                    text: Some(reply_message),
-                                    ..Default::default()
-                                };
-
-                                let response = post_message(
-                                    &socket_mode.api_client,
-                                    &request,
-                                    &socket_mode.bot_token,
+                                slack::reply_in_thread(
+                                    socket_mode,
+                                    &message,
+                                    reply_thread_ts,
+                                    reply_message,
                                 )
-                                .await
-                                .expect("post message api error.");
-                                log::info!("post message api response: {:?}", response);
+                                .await;
                             }
                         }
                     }

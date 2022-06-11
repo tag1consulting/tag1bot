@@ -1,3 +1,6 @@
+// Handles currency conversions and currency conversion alerts.
+// For example, `convert USD to EUR` or `notify me when 1 BTC is greater than 100000 USD`.
+
 use async_std::task;
 use regex::{Regex, RegexSet};
 use rusqlite::params;
@@ -14,15 +17,6 @@ const REGEX_ALERT_LESSER: &str = r"(?i)^(?:alert|notify|tell|ping)(?:\s)*(me|all
 
 const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
 
-// Details needed to determine if a message modifies karma and to build a reply.
-pub(crate) struct ConvertMessage {
-    pub(crate) channel_id: String,
-    pub(crate) username: String,
-    pub(crate) text: String,
-    pub(crate) thread_ts: Option<String>,
-    pub(crate) ts: String,
-}
-
 #[derive(Debug)]
 struct CurrencyAlert {
     id: u32,
@@ -36,7 +30,7 @@ struct CurrencyAlert {
 }
 
 // Check if user is asking for currency conversion.
-pub(crate) async fn process_message(message: &ConvertMessage) -> Option<(String, String)> {
+pub(crate) async fn process_message(message: &slack::Message) -> Option<(String, String)> {
     let trimmed_text = message.text.trim();
 
     // First test if this is a request to convert currency.
@@ -104,7 +98,7 @@ pub(crate) async fn currency_convert(trimmed_text: &str) -> Option<String> {
 }
 
 // Determine if this is a request to set a ccurrency conversion alert.
-pub(crate) async fn currency_alert(message: &ConvertMessage, trimmed_text: &str) -> Option<String> {
+pub(crate) async fn currency_alert(message: &slack::Message, trimmed_text: &str) -> Option<String> {
     let set = RegexSet::new(&[REGEX_ALERT_GREATER, REGEX_ALERT_LESSER])
         .expect("failed to build RegexSet");
     if set.is_match(trimmed_text) {
@@ -163,7 +157,7 @@ pub(crate) async fn currency_alert(message: &ConvertMessage, trimmed_text: &str)
         let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
         db.execute(
             r#"INSERT INTO currency_alert (channel, user, from_currency, from_amount, comparison, to_currency, to_amount)  VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            params![message.channel_id, message.username, from_currency, from_amount, comparison, to_currency, to_amount],
+            params![message.channel.id, message.user.name, from_currency, from_amount, comparison, to_currency, to_amount],
         )
         .expect("failed to increment karma");
 

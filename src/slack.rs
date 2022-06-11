@@ -1,5 +1,9 @@
-// Custom Slack functionality.
+// Additional Slack functionality beyond what is provided by the slack_rust crate.
+
 use serde::{Deserialize, Serialize};
+use slack_rust::chat::post_message::{post_message, PostMessageRequest};
+use slack_rust::http_client::SlackWebAPIClient;
+use slack_rust::socket::socket_mode::SocketMode;
 use std::env;
 
 // Calls to users_info return the following.
@@ -8,6 +12,34 @@ pub(crate) struct UserWrapper {
     ok: bool,
     user: Option<User>,
     error: Option<String>,
+}
+
+// Details needed to track when a user was last seen.
+#[derive(Debug)]
+pub(crate) struct Message {
+    pub(crate) user: User,
+    pub(crate) channel: Channel,
+    pub(crate) text: String,
+    pub(crate) thread_ts: Option<String>,
+    pub(crate) ts: String,
+}
+
+impl Message {
+    pub(crate) fn new(
+        channel: Channel,
+        user: User,
+        text: String,
+        thread_ts: Option<String>,
+        ts: String,
+    ) -> Message {
+        Message {
+            channel,
+            user,
+            text,
+            thread_ts,
+            ts,
+        }
+    }
 }
 
 // All available user info, see https://api.slack.com/methods/users.info.
@@ -158,4 +190,26 @@ pub(crate) async fn post_text(channel_id: &str, text: &str) {
     .await;
 
     println!("{:#?}", _res);
+}
+
+// Reply to a specific message in a thread.
+pub(crate) async fn reply_in_thread<S>(
+    socket_mode: &SocketMode<S>,
+    message: &Message,
+    reply_thread_ts: String,
+    reply_message: String,
+) where
+    S: SlackWebAPIClient,
+{
+    let request = PostMessageRequest {
+        channel: message.channel.id.clone(),
+        thread_ts: Some(reply_thread_ts),
+        text: Some(reply_message),
+        ..Default::default()
+    };
+
+    let response = post_message(&socket_mode.api_client, &request, &socket_mode.bot_token)
+        .await
+        .expect("post message api error.");
+    log::info!("post message api response: {:?}", response);
 }
