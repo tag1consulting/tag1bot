@@ -56,7 +56,7 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
         return None;
     } else if let Some(last_seen) = requested_user_last_seen {
         format!(
-            "`{}` last seen in `#{}` saying `{}` {}.",
+            "`{}` last seen in <#{}> saying `{}` {}.",
             last_seen.user,
             last_seen.channel,
             last_seen.last_said,
@@ -123,7 +123,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                 db.execute(
                     "UPDATE seen SET channel = ?1, last_said = ?2, last_seen = ?3 WHERE user = ?4",
                     params![
-                        seen_message.channel.name,
+                        seen_message.channel.id,
                         seen_message.text,
                         util::timestamp_now(),
                         seen_message.user.name.to_lowercase()
@@ -151,7 +151,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                     params![
                         seen_message.user.name.to_lowercase(),
                         seen_message.text,
-                        seen_message.channel.name,
+                        seen_message.channel.id,
                         util::timestamp_now(),
                     ],
                 )
