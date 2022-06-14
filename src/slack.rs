@@ -42,6 +42,14 @@ impl Message {
     }
 }
 
+// Used to post message directly into channel, using serde to handle serialization.
+#[derive(Deserialize, Serialize, Debug)]
+struct JsonMessage {
+    channel: String,
+    text: String,
+    mrkdwn: bool,
+}
+
 // All available user info, see https://api.slack.com/methods/users.info.
 #[derive(Deserialize, Serialize, Debug)]
 pub(crate) struct User {
@@ -181,13 +189,17 @@ pub(crate) async fn post_text(channel_id: &str, text: &str) {
     let slack_bot_token = env::var("SLACK_BOT_TOKEN")
         .unwrap_or_else(|_| panic!("slack bot token is not set (starts with 'xoxb')."));
 
-    let res = surf::post(format!(
-        "https://slack.com/api/chat.postMessage?channel={}&text={}&mrkdwn=true",
-        channel_id, text
-    ))
-    .header("Authorization", format!("Bearer {}", slack_bot_token))
-    .send()
-    .await;
+    let message = JsonMessage {
+        channel: channel_id.to_string(),
+        text: text.to_string(),
+        mrkdwn: true,
+    };
+
+    let res = surf::post("https://slack.com/api/chat.postMessage")
+        .header("Authorization", format!("Bearer {}", slack_bot_token))
+        .body_json(&message)
+        .expect("failed to serialize json")
+        .await;
 
     println!("{:?}", res);
 }
