@@ -83,19 +83,23 @@ pub(crate) async fn currency_convert(trimmed_text: &str) -> Option<String> {
     // Convert number string to f32, defaulting to 1.0 if empty or invalid.
     let amount = amount.trim().parse::<f32>().unwrap_or(1.0);
 
+    // Always work in upper case.
+    let from_currency = from_currency.to_uppercase();
+    let to_currency = to_currency.to_uppercase();
+
     // Perform the remote currency quote request.
-    let value = get_currency_quote(from_currency, to_currency, amount).await;
+    let value = get_currency_quote(&from_currency, &to_currency, amount).await;
 
     if let Ok(value) = value {
         Some(format!(
-            "{} {} is currently [{} {}]({}).",
+            "{} {} is currently <{}|{} {}>.",
             amount,
-            from_currency.to_uppercase(),
-            value,
-            to_currency.to_uppercase(),
-            get_currency_range_24h(from_currency, to_currency, amount)
+            from_currency,
+            get_currency_range_24h(&from_currency, &to_currency, amount)
                 .await
                 .unwrap(),
+            value,
+            to_currency,
         ))
     } else if let Err(message) = value {
         // Something went wrong with currency conversion, pass along the message.
@@ -131,6 +135,9 @@ pub(crate) async fn currency_alert(message: &slack::Message, trimmed_text: &str)
         let from_amount = from_amount.trim().parse::<f32>().unwrap_or(1.0);
         let to_amount = to_amount.trim().parse::<f32>().unwrap_or(1.0);
 
+        let from_currency = from_currency.to_uppercase();
+        let to_currency = to_currency.to_uppercase();
+
         let who = if who.is_empty() || who == "me" {
             " you"
         } else {
@@ -140,7 +147,7 @@ pub(crate) async fn currency_alert(message: &slack::Message, trimmed_text: &str)
         let comparison = if set_match == 0 { "more" } else { "less" };
 
         // Before we set an alert, be sure the request isn't already rue.
-        let value = get_currency_quote(from_currency, to_currency, from_amount).await;
+        let value = get_currency_quote(&from_currency, &to_currency, from_amount).await;
 
         // If currency conversion failed, pass the error along and exit.
         if let Err(e) = value {
@@ -202,8 +209,8 @@ pub(crate) async fn get_currency_range_24h(
     let response = match match surf::get(format!(
         "{}?from={}&to={}&amount={}&start_timestamp={}&end_timestamp={}&interval=hourly&crypto=true",
         CURRENCY_API_RANGE,
-        from_currency.to_uppercase(),
-        to_currency.to_uppercase(),
+        from_currency,
+        to_currency,
         amount,
         start_timestamp,
         end_timestamp,
@@ -253,8 +260,7 @@ pub(crate) async fn get_currency_range_24h(
             None => {
                 return Err(format!(
                     "{} and/or {} unknown, failed to convert.",
-                    from_currency.to_uppercase(),
-                    to_currency.to_uppercase()
+                    from_currency, to_currency
                 ))
             }
         }
@@ -263,8 +269,7 @@ pub(crate) async fn get_currency_range_24h(
             None => {
                 return Err(format!(
                     "{} and/or {} unknown, failed to convert.",
-                    from_currency.to_uppercase(),
-                    to_currency.to_uppercase()
+                    from_currency, to_currency
                 ))
             }
         }
@@ -275,7 +280,7 @@ pub(crate) async fn get_currency_range_24h(
         amount, from_currency, to_currency
     );
     Ok(format!(
-        "{}?data1={}&labels={}&title={}",
+        "{}?data1={}&amp;labels={}&amp;title={}",
         CURRENCY_RANGE_CHART,
         values.join(","),
         keys.join(","),
@@ -296,10 +301,7 @@ pub(crate) async fn get_currency_quote(
     // Make the remote request.
     let response = match match surf::get(format!(
         "{}?from={}&to={}&amount={}&crypto=true",
-        CURRENCY_API,
-        from_currency.to_uppercase(),
-        to_currency.to_uppercase(),
-        amount,
+        CURRENCY_API, from_currency, to_currency, amount,
     ))
     .header("Authorization", util::generate_basic_auth(&id, &key))
     .await
@@ -342,8 +344,7 @@ pub(crate) async fn get_currency_quote(
         None => {
             return Err(format!(
                 "{} and/or {} unknown, failed to convert.",
-                from_currency.to_uppercase(),
-                to_currency.to_uppercase()
+                from_currency, to_currency
             ))
         }
     };
