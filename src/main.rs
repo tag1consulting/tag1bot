@@ -193,7 +193,7 @@ where
                             if let Some((reply_thread_ts, reply_message)) =
                                 convert::process_message(&message).await
                             {
-                                slack::reply_in_thread(
+                                slack::reply_markdown_in_thread(
                                     socket_mode,
                                     &message,
                                     reply_thread_ts,

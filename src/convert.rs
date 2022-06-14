@@ -2,6 +2,7 @@
 // For example, `convert USD to EUR` or `notify me when 1 BTC is greater than 100000 USD`.
 
 use async_std::task;
+use chrono::prelude::*;
 use regex::{Regex, RegexSet};
 use rusqlite::params;
 use std::{collections::HashMap, env, time::Duration};
@@ -16,6 +17,10 @@ const REGEX_ALERT_GREATER: &str = r"(?i)^(?:alert|notify|tell|ping)(?:\s)*(me|al
 const REGEX_ALERT_LESSER: &str = r"(?i)^(?:alert|notify|tell|ping)(?:\s)*(me|all|everyone)?(?:\s)*(?:when|if)?(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})(?:\s)*(?:is)?(?:\s)*(?:lesser|less|lesser than|less than|lesser then|less than|lt|<)(?:\s)*([0-9]*(?:\.[0-9]*)?){1}(?:\s)*([a-z]{3,4})*$";
 
 const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
+const CURRENCY_API_RANGE: &str = "https://xecdapi.xe.com/v1/historic_rate/period/";
+
+const CURRENCY_RANGE_CHART: &str =
+    "https://quickchart.io/chart/render/zm-e4b8c457-13b2-4715-b269-94144a71b31f";
 
 #[derive(Debug)]
 struct CurrencyAlert {
@@ -83,11 +88,14 @@ pub(crate) async fn currency_convert(trimmed_text: &str) -> Option<String> {
 
     if let Ok(value) = value {
         Some(format!(
-            "{} {} is currently {} {}.",
+            "{} {} is currently [{} {}]({}).",
             amount,
             from_currency.to_uppercase(),
             value,
-            to_currency.to_uppercase()
+            to_currency.to_uppercase(),
+            get_currency_range_24h(from_currency, to_currency, amount)
+                .await
+                .unwrap(),
         ))
     } else if let Err(message) = value {
         // Something went wrong with currency conversion, pass along the message.
@@ -171,6 +179,111 @@ pub(crate) async fn currency_alert(message: &slack::Message, trimmed_text: &str)
 }
 
 // Determine if this is a request to set a ccurrency conversion alert.
+pub(crate) async fn get_currency_range_24h(
+    from_currency: &str,
+    to_currency: &str,
+    amount: f32,
+) -> Result<String, String> {
+    // Get XE API secrets from the envinroment.
+    let id = env::var("XE_ACCOUNT_ID").unwrap_or_else(|_| panic!("XE_ACCOUNT_ID is not set."));
+    let key = env::var("XE_API_KEY").unwrap_or_else(|_| panic!("XE_API_KEY is not set."));
+
+    // Groub hourly data for the past 24 hours.
+    let gmt: DateTime<Utc> = Utc::now();
+    let end_timestamp = gmt.format("%Y-%m-%dT%H:%M").to_string();
+    let day_ago_gmt = gmt
+        .checked_sub_signed(chrono::Duration::days(1))
+        .expect("failed to subtract a day");
+    let start_timestamp = day_ago_gmt.format("%Y-%m-%dT%H:%M").to_string();
+
+    println!("start({}) end({})", start_timestamp, end_timestamp);
+
+    // Make the remote request.
+    let response = match match surf::get(format!(
+        "{}?from={}&to={}&amount={}&start_timestamp={}&end_timestamp={}&interval=hourly&crypto=true",
+        CURRENCY_API_RANGE,
+        from_currency.to_uppercase(),
+        to_currency.to_uppercase(),
+        amount,
+        start_timestamp,
+        end_timestamp,
+    ))
+    .header("Authorization", util::generate_basic_auth(&id, &key))
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return Err(format!(
+                "Sorry, my request to the ConversionAPI failed (`surf::get()`): {}",
+                e
+            ));
+        }
+    }
+    .body_string()
+    .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(format!(
+                "Sorry, my request to the ConversionAPI failed (`surf::body_string()`): {}",
+                e
+            ));
+        }
+    };
+
+    // Parse the CurrencyAPI response.
+    let mut parsed_response = match json::parse(&response) {
+        Ok(j) => j,
+        Err(e) => {
+            return Err(format!(
+                "Sorry, the response from the ConversionAPI was invalid (`json::parse` error): {}",
+                e
+            ))
+        }
+    };
+
+    let mut keys = Vec::new();
+    let mut values = Vec::new();
+
+    // Extract the conversion rate from the parsed JSON.
+    let timestamps = parsed_response["to"][to_currency].take();
+    for timestamp in timestamps.members() {
+        match timestamp["timestamp"].as_str() {
+            Some(v) => keys.push(v.to_string()),
+            None => {
+                return Err(format!(
+                    "{} and/or {} unknown, failed to convert.",
+                    from_currency.to_uppercase(),
+                    to_currency.to_uppercase()
+                ))
+            }
+        }
+        match timestamp["mid"].as_f32() {
+            Some(v) => values.push(format!("{:.prec$}", v, prec = 8)),
+            None => {
+                return Err(format!(
+                    "{} and/or {} unknown, failed to convert.",
+                    from_currency.to_uppercase(),
+                    to_currency.to_uppercase()
+                ))
+            }
+        }
+    }
+
+    let title = format!(
+        "{} {} to {} past 24 hours",
+        amount, from_currency, to_currency
+    );
+    Ok(format!(
+        "{}?data1={}&labels={}&title={}",
+        CURRENCY_RANGE_CHART,
+        values.join(","),
+        keys.join(","),
+        title,
+    ))
+}
+
+// Determine if this is a request to set a ccurrency conversion alert.
 pub(crate) async fn get_currency_quote(
     from_currency: &str,
     to_currency: &str,
@@ -179,13 +292,14 @@ pub(crate) async fn get_currency_quote(
     // Get XE API secrets from the envinroment.
     let id = env::var("XE_ACCOUNT_ID").unwrap_or_else(|_| panic!("XE_ACCOUNT_ID is not set."));
     let key = env::var("XE_API_KEY").unwrap_or_else(|_| panic!("XE_API_KEY is not set."));
+
     // Make the remote request.
     let response = match match surf::get(format!(
         "{}?from={}&to={}&amount={}&crypto=true",
         CURRENCY_API,
         from_currency.to_uppercase(),
         to_currency.to_uppercase(),
-        amount
+        amount,
     ))
     .header("Authorization", util::generate_basic_auth(&id, &key))
     .await
