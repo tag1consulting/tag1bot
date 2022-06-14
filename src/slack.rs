@@ -181,15 +181,15 @@ pub(crate) async fn post_text(channel_id: &str, text: &str) {
     let slack_bot_token = env::var("SLACK_BOT_TOKEN")
         .unwrap_or_else(|_| panic!("slack bot token is not set (starts with 'xoxb')."));
 
-    let _res = surf::post(format!(
-        "https://slack.com/api/chat.postMessage?channel={}&text={}",
+    let res = surf::post(format!(
+        "https://slack.com/api/chat.postMessage?channel={}&text={}&mrkdwn=true",
         channel_id, text
     ))
     .header("Authorization", format!("Bearer {}", slack_bot_token))
     .send()
     .await;
 
-    println!("{:#?}", _res);
+    println!("{:?}", res);
 }
 
 // Reply to a specific message in a thread.

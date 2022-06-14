@@ -203,8 +203,6 @@ pub(crate) async fn get_currency_range_24h(
         .expect("failed to subtract a day");
     let start_timestamp = day_ago_gmt.format("%Y-%m-%dT%H:%M").to_string();
 
-    println!("start({}) end({})", start_timestamp, end_timestamp);
-
     // Make the remote request.
     let response = match match surf::get(format!(
         "{}?from={}&to={}&amount={}&start_timestamp={}&end_timestamp={}&interval=hourly&crypto=true",

@@ -8,8 +8,8 @@ use crate::db::DB;
 use crate::slack;
 use crate::TAG1BOT_USER;
 
-const REGEX_KARMA_PLUS: &str = r"^(\w{2,20})\+\+$";
-const REGEX_KARMA_MINUS: &str = r"^(\w{2,20})\-\-$";
+const REGEX_KARMA_PLUS: &str = r"^(\w{2,20})(?:\s)*\+\+$";
+const REGEX_KARMA_MINUS: &str = r"^(\w{2,20})(?:\s)*\-\-$";
 
 // Determine if Karma is being modified in this message. Returns `Some(thread id, message)` if karma
 // is modified, returns `None` if not,
