@@ -274,7 +274,7 @@ pub(crate) async fn get_currency_range_24h(
     }
 
     let title = format!(
-        "{} {} to {} past 24 hours",
+        "{}%20{}%20to%20{}%20past%2024%20hours",
         amount, from_currency, to_currency
     );
     Ok(format!(
