@@ -213,3 +213,26 @@ pub(crate) async fn reply_in_thread<S>(
         .expect("post message api error.");
     log::info!("post message api response: {:?}", response);
 }
+
+// Reply to a specific message in a thread.
+pub(crate) async fn reply_markdown_in_thread<S>(
+    socket_mode: &SocketMode<S>,
+    message: &Message,
+    reply_thread_ts: String,
+    reply_message: String,
+) where
+    S: SlackWebAPIClient,
+{
+    let request = PostMessageRequest {
+        channel: message.channel.id.clone(),
+        thread_ts: Some(reply_thread_ts),
+        text: Some(reply_message),
+        mrkdwn: Some(true),
+        ..Default::default()
+    };
+
+    let response = post_message(&socket_mode.api_client, &request, &socket_mode.bot_token)
+        .await
+        .expect("post message api error.");
+    log::info!("post message api response: {:?}", response);
+}
