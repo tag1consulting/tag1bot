@@ -9,7 +9,7 @@ use crate::slack;
 use crate::TAG1BOT_USER;
 
 const REGEX_KARMA_WORD: &str = r#"^(?:@|#)??(\w{2,20})(?:\s)*(\+\+|\-\-)$"#;
-const REGEX_KARMA_MENTION: &str = r#"^<@(\w{9})>(?:\s)*(\+\+|\-\-)$"#;
+const REGEX_KARMA_MENTION: &str = r#"^<@(\w{5,15})>(?:\s)*(\+\+|\-\-)$"#;
 
 // Determine if Karma is being modified in this message. Returns `Some(thread id, message)` if karma
 // is modified, returns `None` if not,
