@@ -164,6 +164,7 @@ where
                         // The latest message received from Slack.
                         let message =
                             slack::Message::new(channel_object, user_object, text, thread_ts, ts);
+                        //println!("{:#?}", message);
                         // Process the message for karma.
                         if let Some((reply_thread_ts, reply_message)) =
                             karma::process_message(&message).await

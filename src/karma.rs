@@ -8,15 +8,15 @@ use crate::db::DB;
 use crate::slack;
 use crate::TAG1BOT_USER;
 
-const REGEX_KARMA_PLUS: &str = r#"^(?:@|#)??(\w{2,20})(?:\s)*\+\+$"#;
-const REGEX_KARMA_MINUS: &str = r#"^(?:@|#)??(\w{2,20})(?:\s)*\-\-$"#;
+const REGEX_KARMA_WORD: &str = r#"^(?:@|#)??(\w{2,20})(?:\s)*(\+\+|\-\-)$"#;
+const REGEX_KARMA_MENTION: &str = r#"^<@(\w{9})>(?:\s)*(\+\+|\-\-)$"#;
 
 // Determine if Karma is being modified in this message. Returns `Some(thread id, message)` if karma
 // is modified, returns `None` if not,
 pub(crate) async fn process_message(message: &slack::Message) -> Option<(String, String)> {
     if message.user.id != TAG1BOT_USER {
         let trimmed_text = message.text.trim();
-        let set = RegexSet::new(&[REGEX_KARMA_PLUS, REGEX_KARMA_MINUS])
+        let set = RegexSet::new(&[REGEX_KARMA_MENTION, REGEX_KARMA_WORD])
             .expect("failed to build RegexSet");
         if set.is_match(trimmed_text) {
             // Always reply in a thread: determine if reply is in a new thread or an existing thread.
@@ -26,31 +26,46 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
                 message.ts.clone()
             };
             let matches: Vec<_> = set.matches(trimmed_text).into_iter().collect();
-            let set_match = matches[0];
-            let reply_message = if set_match == 0 {
-                let re = Regex::new(REGEX_KARMA_PLUS).expect("failed to compile REGEX_KARMA_PLUS");
+            // Matched @MENTION, convert user_id to name (word).
+            let (word, adjustment) = if matches[0] == 0 {
+                let re =
+                    Regex::new(REGEX_KARMA_MENTION).expect("failed to compile REGEX_KARMA_MENTION");
                 let cap = re
                     .captures(trimmed_text)
-                    .expect("failed to capture REGEX_KARMA_PLUS");
-                let item = cap.get(1).map_or("", |m| m.as_str());
-                // Only run karma if user is not self-incrementing.
-                if message.user.name.to_lowercase() != item.to_lowercase() {
-                    let karma = increment(&item.to_lowercase());
-                    format!("Karma for `{}` increased to {}.", item, karma)
+                    .expect("failed to capture REGEX_KARMA_MENTION");
+                let word = match slack::users_info(&cap[1]).await {
+                    Ok(u) => u.name.to_lowercase(),
+                    Err(e) => {
+                        println!("unexpected error: {}", e);
+                        return None;
+                    }
+                };
+                let adjustment = cap[2].to_string();
+                (word, adjustment)
+            // Matched WORD.
+            } else {
+                let re = Regex::new(REGEX_KARMA_WORD).expect("failed to compile REGEX_KARMA_WORD");
+                let cap = re
+                    .captures(trimmed_text)
+                    .expect("failed to capture REGEX_KARMA_WORD");
+                let word = cap[1].to_lowercase();
+                let adjustment = cap[2].to_string();
+                (word, adjustment)
+            };
+
+            let reply_message = if adjustment == "++" {
+                if message.user.name.to_lowercase() != word {
+                    let karma = increment(&word);
+                    format!("Karma for `{}` increased to {}.", word, karma)
                 } else {
-                    let karma = decrement(&item.to_lowercase());
-                    format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", item, karma)
+                    let karma = decrement(&word);
+                    format!("Karma cannot be incremented for yourself, you have been penalized: Karma for `{}` decreased to {}.", word, karma)
                 }
             } else {
-                let re =
-                    Regex::new(REGEX_KARMA_MINUS).expect("failed to compile REGEX_KARMA_MINUS");
-                let cap = re
-                    .captures(trimmed_text)
-                    .expect("failed to capture REGEX_KARMA_MINUS");
-                let item = cap.get(1).map_or("", |m| m.as_str());
-                let karma = decrement(&item.to_lowercase());
-                format!("Karma for `{}` decreased to {}.", item, karma)
+                let karma = decrement(&word);
+                format!("Karma for `{}` decreased to {}.", word, karma)
             };
+
             return Some((reply_thread_ts, reply_message));
         }
     }
