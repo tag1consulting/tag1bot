@@ -168,11 +168,17 @@ pub(crate) async fn currency_alert(message: &slack::Message, trimmed_text: &str)
             }
         }
 
+        let user_id = if let Some(user) = message.user.as_ref() {
+            &user.id
+        } else {
+            ""
+        };
+
         // Add alert to the database.
         let db = DB.lock().unwrap_or_else(|_| panic!("DB mutex poisoned!"));
         db.execute(
             r#"INSERT INTO currency_alert (channel, user, from_currency, from_amount, comparison, to_currency, to_amount)  VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            params![message.channel.id, message.user.id, from_currency, from_amount, comparison, to_currency, to_amount],
+            params![message.channel.id, user_id, from_currency, from_amount, comparison, to_currency, to_amount],
         )
         .expect("failed to increment karma");
 

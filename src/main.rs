@@ -20,12 +20,6 @@ mod util;
 #[macro_use]
 extern crate lazy_static;
 
-// Validation token to confirm command request was issued by Slack.
-//const TAG1BOT_TOKEN: &str = "wSzWcxIK4FaiJjZ6CwA6zlu7";
-
-// @TODO: Get this on the fly?
-const TAG1BOT_USER: &str = "U03HT8ALNF4";
-
 #[async_std::main]
 async fn main() {
     env_logger::init();
@@ -157,10 +151,18 @@ where
                     user,
                     ..
                 } => {
-                    if let (Ok(user_object), Ok(channel_object)) = (
-                        slack::users_info(&user).await,
-                        slack::channels_info(&channel).await,
-                    ) {
+                    // Channel is required.
+                    if let Ok(channel_object) = slack::channels_info(&channel).await {
+                        let user_object = if let Some(unwrapped_user) = user {
+                            if let Ok(user_object) = slack::users_info(&unwrapped_user).await {
+                                Some(user_object)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                         // The latest message received from Slack.
                         let message =
                             slack::Message::new(channel_object, user_object, text, thread_ts, ts);

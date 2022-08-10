@@ -1520,7 +1520,7 @@ checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 [[package]]
 name = "slack-rust"
 version = "0.0.2"
-source = "git+https://github.com/jeremyandrews/slack-rust#cc871f2431233b4077ba5ad18d01b24c0b1eb924"
+source = "git+https://github.com/jeremyandrews/slack-rust#30b466c603654debae19f651883b59d500999087"
 dependencies = [
  "async-std",
  "async-tls",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "tag1bot"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "async-std",
  "async-trait",

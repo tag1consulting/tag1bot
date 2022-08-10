@@ -17,7 +17,7 @@ pub(crate) struct UserWrapper {
 // Details needed to track when a user was last seen.
 #[derive(Debug)]
 pub(crate) struct Message {
-    pub(crate) user: User,
+    pub(crate) user: Option<User>,
     pub(crate) channel: Channel,
     pub(crate) text: String,
     pub(crate) thread_ts: Option<String>,
@@ -27,7 +27,7 @@ pub(crate) struct Message {
 impl Message {
     pub(crate) fn new(
         channel: Channel,
-        user: User,
+        user: Option<User>,
         text: String,
         thread_ts: Option<String>,
         ts: String,
