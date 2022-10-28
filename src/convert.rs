@@ -20,7 +20,7 @@ const CURRENCY_API: &str = "https://xecdapi.xe.com/v1/convert_from.json/";
 const CURRENCY_API_RANGE: &str = "https://xecdapi.xe.com/v1/historic_rate/period/";
 
 const CURRENCY_RANGE_CHART: &str =
-    "https://quickchart.io/chart/render/zm-e4b8c457-13b2-4715-b269-94144a71b31f";
+    "https://quickchart.io/chart/render/zm-7f5654de-a5ed-4c06-b311-830cedb7aa9a";
 
 #[derive(Debug)]
 struct CurrencyAlert {
