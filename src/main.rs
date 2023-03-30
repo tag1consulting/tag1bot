@@ -1,4 +1,3 @@
-use async_std::task;
 use async_trait::async_trait;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -10,6 +9,7 @@ use slack_rust::socket::socket_mode::{ack, EventHandler, SocketMode, Stream};
 use std::env;
 use std::time::Duration;
 
+mod chatgpt;
 mod convert;
 mod db;
 mod karma;
@@ -20,7 +20,7 @@ mod util;
 #[macro_use]
 extern crate lazy_static;
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     env_logger::init();
 
@@ -45,7 +45,7 @@ async fn main() {
 
     // If currency conversions is enabled, start the alert thread.
     if enable_currency {
-        task::spawn(async {
+        tokio::spawn(async {
             convert::alert_thread().await;
         });
     }
@@ -66,7 +66,7 @@ async fn main() {
         };
 
         // Wait a few seconds before reconnecting.
-        task::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
 
@@ -195,6 +195,20 @@ where
                         if env::var("XE_ACCOUNT_ID").is_ok() && env::var("XE_API_KEY").is_ok() {
                             if let Some((reply_thread_ts, reply_message)) =
                                 convert::process_message(&message).await
+                            {
+                                slack::reply_in_thread(
+                                    socket_mode,
+                                    &message,
+                                    reply_thread_ts,
+                                    reply_message,
+                                )
+                                .await;
+                            }
+                        }
+                        // If enabled, process the message for ChatGPT.
+                        if env::var("CHATGPT_API_KEY").is_ok() {
+                            if let Some((reply_thread_ts, reply_message)) =
+                                chatgpt::process_message(&message).await
                             {
                                 slack::reply_in_thread(
                                     socket_mode,

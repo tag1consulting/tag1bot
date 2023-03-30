@@ -20,6 +20,12 @@ The bot also recognizes "alert me when # FOO is [greater|less] # bar" style requ
 
 The convert features require that you set up an account on https://www.xe.com/xecurrencydata/ and configure the `XE_ACCOUNT_ID` and `XE_API_KEY` environment variables when starting the bot.
 
+## ChatGPT
+
+The bot recognizes any message starting with "chatgpt" as a message to send to the ChatGPT API. For example, "chatgpt why is the rust programming language so popular?".
+
+The chatgpt feature requires that you have an OpenAI ChatGPT API key and configure the `CHATGPT_API_KEY` environment variable when starting the bot.
+
 # How To Use
 
 First, register a new bot in your workspace by clicking `Create New App` at https://api.slack.com/apps. Create from scratch. You can name your bot whatever you want, `Tag1bot`, `Sea Cow`, `Druplicon`, whatever you prefer!

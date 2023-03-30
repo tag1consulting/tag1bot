@@ -62,4 +62,20 @@ pub(crate) fn setup() {
         [],
     )
     .expect("failed to create currency_alert table");
+
+    // Create the chatgpt_threads table if it doesn't already exist.
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS chatgpt_context (
+        id              INTEGER PRIMARY KEY,
+        thread          TEXT NOT NULL,
+        context         TEXT NOT NULL
+            )",
+        [],
+    )
+    .expect("failed to create chatgpt_threads table");
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS i_thread ON chatgpt_context (thread)",
+        [],
+    )
+    .expect("failed to create index karma.i_name");
 }

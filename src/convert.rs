@@ -1,7 +1,6 @@
 // Handles currency conversions and currency conversion alerts.
 // For example, `convert USD to EUR` or `notify me when 1 BTC is greater than 100000 USD`.
 
-use async_std::task;
 use chrono::prelude::*;
 use regex::{Regex, RegexSet};
 use rusqlite::params;
@@ -441,7 +440,7 @@ pub(crate) async fn alert_thread() {
             60 * 60 * 24
         };
         log::info!("currency alert thread sleeping {} seconds", sleep_seconds);
-        task::sleep(Duration::from_secs(sleep_seconds)).await;
+        tokio::time::sleep(Duration::from_secs(sleep_seconds)).await;
     }
 }
 
