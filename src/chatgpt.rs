@@ -8,7 +8,7 @@ use std::env;
 use crate::db::DB;
 use crate::slack;
 
-const REGEX_CHATGPT: &str = r#"^chatgpt (.*)$"#;
+const REGEX_CHATGPT: &str = r#"(?i)^chatgpt (.*)$"#;
 
 // All messages in a given ChatGPT conversation.
 #[derive(Debug)]
