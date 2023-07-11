@@ -64,7 +64,7 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
     let client = match ChatGPT::new_with_config(
         api_key,
         ModelConfigurationBuilder::default()
-            .engine(ChatGPTEngine::Gpt4_32k)
+            .engine(ChatGPTEngine::Gpt4)
             .build()
             .unwrap(),
     ) {
