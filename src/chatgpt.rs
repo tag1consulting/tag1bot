@@ -61,7 +61,13 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
     };
 
     // Create a new ChatGPT client.
-    let client = match ChatGPT::new(api_key) {
+    let client = match ChatGPT::new_with_config(
+        api_key,
+        ModelConfigurationBuilder::default()
+            .engine(ChatGPTEngine::Gpt4_32k)
+            .build()
+            .unwrap(),
+    ) {
         Ok(key) => key,
         Err(e) => {
             println!("failed to create ChatGPT client: {}", e);
