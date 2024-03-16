@@ -10,6 +10,7 @@ use std::env;
 use std::time::Duration;
 
 mod chatgpt;
+mod claude;
 mod convert;
 mod db;
 mod karma;
