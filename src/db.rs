@@ -72,10 +72,26 @@ pub(crate) fn setup() {
             )",
         [],
     )
-    .expect("failed to create chatgpt_threads table");
+    .expect("failed to create chatgpt_context table");
     db.execute(
         "CREATE INDEX IF NOT EXISTS i_thread ON chatgpt_context (thread)",
         [],
     )
-    .expect("failed to create index karma.i_name");
+    .expect("failed to create index chatgpt_context.i_thread");
+
+    // Create the claude_context table if it doesn't already exist.
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS claude_context (
+        id              INTEGER PRIMARY KEY,
+        thread          TEXT NOT NULL,
+        context         TEXT NOT NULL
+            )",
+        [],
+    )
+    .expect("failed to create claude_context table");
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS i_thread ON claude_context (thread)",
+        [],
+    )
+    .expect("failed to create index claude.i_thread");
 }
