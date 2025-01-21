@@ -1,4 +1,5 @@
 // General utility functions.
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -6,10 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 // What is returned must be set in an `Authorization` header, ie:
 //   .header("Authorization", util::generate_basic_auth("username:password"))
 pub(crate) fn generate_basic_auth(username: &str, password: &str) -> String {
-    format!(
-        "Basic {}",
-        base64::encode(format!("{}:{}", username, password))
-    )
+    let auth_string = format!("{}:{}", username, password);
+    format!("Basic {}", STANDARD.encode(auth_string))
 }
 
 // Get the time since the unix epoch.
