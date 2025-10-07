@@ -16,6 +16,8 @@ mod karma;
 mod seen;
 mod slack;
 mod util;
+mod translate;
+mod ai;
 
 #[macro_use]
 extern crate lazy_static;
@@ -218,6 +220,18 @@ where
                                 )
                                 .await;
                             }
+                        }
+                        // Process the message for translate
+                        if let Some((reply_thread_ts, reply_message)) =
+                            translate::process_message(&message).await
+                        {
+                            slack::reply_in_thread(
+                                socket_mode,
+                                &message,
+                                reply_thread_ts,
+                                reply_message,
+                            )
+                            .await;
                         }
                     }
                 }
