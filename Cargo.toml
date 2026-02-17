@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.85"
 base64 = "0.22"
-chatgpt_rs = "1.2"
+async-openai = { version = "0.32", features = ["chat-completion"] }
 chrono = "0.4"
 env_logger = "0.11"
 json = "0.12"

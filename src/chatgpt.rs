@@ -1,4 +1,11 @@
-use chatgpt::prelude::*;
+use async_openai::{
+    config::OpenAIConfig,
+    types::chat::{
+        ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
+        ChatCompletionRequestUserMessage, CreateChatCompletionRequestArgs,
+    },
+    Client,
+};
 use regex::Regex;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -22,9 +29,15 @@ pub(crate) struct ChatGPTId {
     id: u32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct StoredMessage {
+    pub role: String,
+    pub content: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct ConversationHistory {
-    pub history: Vec<ChatMessage>,
+    pub history: Vec<StoredMessage>,
 }
 
 // Check if user is talking to chatgpt.
@@ -54,44 +67,60 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
     };
 
     // Load context if this message is in a thread.
-    let chatgpt_context = if message.thread_ts.is_some() {
-        load_chatgpt_context(&reply_thread_ts).await
+    let previous_history = if message.thread_ts.is_some() {
+        match load_chatgpt_context(&reply_thread_ts).await {
+            Some(context_str) => match serde_json::from_str::<ConversationHistory>(&context_str) {
+                Ok(c) => c.history,
+                Err(e) => {
+                    println!("failed to deserialize conversation history: {}", e);
+                    return None;
+                }
+            },
+            None => Vec::new(),
+        }
     } else {
-        None
+        Vec::new()
     };
 
-    // Create a new ChatGPT client.
-    let client = match ChatGPT::new_with_config(
-        api_key,
-        ModelConfigurationBuilder::default()
-            .engine(ChatGPTEngine::Gpt4)
-            .build()
-            .unwrap(),
-    ) {
-        Ok(key) => key,
+    // Build messages from conversation history.
+    let mut messages: Vec<ChatCompletionRequestMessage> = previous_history
+        .iter()
+        .map(|m| match m.role.as_str() {
+            "assistant" => {
+                ChatCompletionRequestAssistantMessage::from(m.content.as_str()).into()
+            }
+            _ => ChatCompletionRequestUserMessage::from(m.content.as_str()).into(),
+        })
+        .collect();
+
+    // Add the new user message.
+    messages.push(ChatCompletionRequestUserMessage::from(chatgpt_request).into());
+
+    // Create a new OpenAI client.
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+
+    // Build the chat completion request.
+    let request = match CreateChatCompletionRequestArgs::default()
+        .model("gpt-5.2")
+        .messages(messages)
+        .build()
+    {
+        Ok(r) => r,
         Err(e) => {
-            println!("failed to create ChatGPT client: {}", e);
+            println!("failed to build chat completion request: {}", e);
             return None;
         }
     };
 
-    // Use conversation if existing, or start a new conversation.
-    let mut conversation = if let Some(context) = chatgpt_context {
-        let conversation_history: ConversationHistory = match serde_json::from_str(&context) {
-            Ok(c) => c,
-            Err(e) => {
-                println!("failed to deserialize converation history: {}", e);
-                return None;
-            }
-        };
-        Conversation::new_with_history(client, conversation_history.history)
-    } else {
-        client.new_conversation()
-    };
-
-    // Sending a message and getting the response.
-    let response = match conversation.send_message(chatgpt_request).await {
-        Ok(r) => r.message().content.to_string(),
+    // Send the request and get the response.
+    let response = match client.chat().create(request).await {
+        Ok(r) => {
+            r.choices
+                .first()
+                .and_then(|c| c.message.content.clone())
+                .unwrap_or_else(|| "No response from model.".to_string())
+        }
         Err(e) => {
             format!(
                 "Sorry, something went wrong (complain to @jeremy please): {}",
@@ -100,10 +129,21 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
         }
     };
 
+    // Update conversation history with the new exchange.
+    let mut updated_history = previous_history;
+    updated_history.push(StoredMessage {
+        role: "user".to_string(),
+        content: chatgpt_request.to_string(),
+    });
+    updated_history.push(StoredMessage {
+        role: "assistant".to_string(),
+        content: response.clone(),
+    });
+
     // Store the conversation context for possible future discussion in the
     // same thread.
     let conversation_history = ConversationHistory {
-        history: conversation.history,
+        history: updated_history,
     };
     store_chatgpt_context(&reply_thread_ts, conversation_history).await;
 
