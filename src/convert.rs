@@ -196,11 +196,13 @@ pub(crate) async fn get_currency_range_24h(
     to_currency: &str,
     amount: f32,
 ) -> Result<String, String> {
-    // Get XE API secrets from the envinroment.
-    let id = env::var("XE_ACCOUNT_ID").unwrap_or_else(|_| panic!("XE_ACCOUNT_ID is not set."));
-    let key = env::var("XE_API_KEY").unwrap_or_else(|_| panic!("XE_API_KEY is not set."));
+    // Get XE API secrets from the environment.
+    let id = env::var("XE_ACCOUNT_ID")
+        .map_err(|_| "XE_ACCOUNT_ID is not set, currency conversion disabled.".to_string())?;
+    let key = env::var("XE_API_KEY")
+        .map_err(|_| "XE_API_KEY is not set, currency conversion disabled.".to_string())?;
 
-    // Groub hourly data for the past 24 hours.
+    // Group hourly data for the past 24 hours.
     let gmt: DateTime<Utc> = Utc::now();
     let end_timestamp = gmt.format("%Y-%m-%dT%H:%M").to_string();
     let day_ago_gmt = gmt
@@ -297,9 +299,11 @@ pub(crate) async fn get_currency_quote(
     to_currency: &str,
     amount: f32,
 ) -> Result<f32, String> {
-    // Get XE API secrets from the envinroment.
-    let id = env::var("XE_ACCOUNT_ID").unwrap_or_else(|_| panic!("XE_ACCOUNT_ID is not set."));
-    let key = env::var("XE_API_KEY").unwrap_or_else(|_| panic!("XE_API_KEY is not set."));
+    // Get XE API secrets from the environment.
+    let id = env::var("XE_ACCOUNT_ID")
+        .map_err(|_| "XE_ACCOUNT_ID is not set, currency conversion disabled.".to_string())?;
+    let key = env::var("XE_API_KEY")
+        .map_err(|_| "XE_API_KEY is not set, currency conversion disabled.".to_string())?;
 
     // Make the remote request.
     let response = match match surf::get(format!(
@@ -373,6 +377,11 @@ pub(crate) async fn get_currency_quote(
 // Wake regularly and process alerts.
 pub(crate) async fn alert_thread() {
     loop {
+        // Don't process alerts if the currency API credentials aren't configured.
+        if env::var("XE_ACCOUNT_ID").is_err() || env::var("XE_API_KEY").is_err() {
+            log::warn!("XE_ACCOUNT_ID or XE_API_KEY not set, currency alerts disabled.");
+            return;
+        }
         // Rebuild currency_map each time around to work with the latest quotes.
         let mut currency_map = HashMap::new();
         let alerts = load_alerts();
