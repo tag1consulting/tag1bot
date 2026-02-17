@@ -118,7 +118,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                     // Only record timestamp if seeing user in a private channel.
                     db.execute(
                         "UPDATE seen SET last_private = ?1 WHERE user = ?2",
-                        params![util::timestamp_now(), user.name.to_lowercase()],
+                        params![util::timestamp_now() as i64, user.name.to_lowercase()],
                     )
                     .expect("failed to update seen");
                 } else {
@@ -128,7 +128,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                     params![
                         seen_message.channel.id,
                         seen_message.text,
-                        util::timestamp_now(),
+                        util::timestamp_now() as i64,
                         user.name.to_lowercase()
                     ],
                 )
@@ -143,7 +143,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                 r#"INSERT INTO seen (user, last_said, channel, last_seen, last_private) VALUES(?1, "", "", 0, ?2)"#,
                 params![
                     user.name.to_lowercase(),
-                    util::timestamp_now(),
+                    util::timestamp_now() as i64,
                 ],
             )
             .expect("failed to insert into seen");
@@ -155,7 +155,7 @@ fn record_seen(seen_message: &slack::Message, is_private: bool, previously_seen:
                         user.name.to_lowercase(),
                         seen_message.text,
                         seen_message.channel.id,
-                        util::timestamp_now(),
+                        util::timestamp_now() as i64,
                     ],
                 )
                 .expect("failed to insert into seen");

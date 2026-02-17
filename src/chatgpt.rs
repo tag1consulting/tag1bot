@@ -86,9 +86,7 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
     let mut messages: Vec<ChatCompletionRequestMessage> = previous_history
         .iter()
         .map(|m| match m.role.as_str() {
-            "assistant" => {
-                ChatCompletionRequestAssistantMessage::from(m.content.as_str()).into()
-            }
+            "assistant" => ChatCompletionRequestAssistantMessage::from(m.content.as_str()).into(),
             _ => ChatCompletionRequestUserMessage::from(m.content.as_str()).into(),
         })
         .collect();
@@ -115,12 +113,11 @@ pub(crate) async fn process_message(message: &slack::Message) -> Option<(String,
 
     // Send the request and get the response.
     let response = match client.chat().create(request).await {
-        Ok(r) => {
-            r.choices
-                .first()
-                .and_then(|c| c.message.content.clone())
-                .unwrap_or_else(|| "No response from model.".to_string())
-        }
+        Ok(r) => r
+            .choices
+            .first()
+            .and_then(|c| c.message.content.clone())
+            .unwrap_or_else(|| "No response from model.".to_string()),
         Err(e) => {
             format!(
                 "Sorry, something went wrong (complain to @jeremy please): {}",
