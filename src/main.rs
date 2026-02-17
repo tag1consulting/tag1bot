@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::seq::IndexedRandom;
 use slack_rust::chat::post_message::{post_message, PostMessageRequest};
 use slack_rust::event_api::event::{Event, EventCallbackType};
 use slack_rust::http_client::{default_client, SlackWebAPIClient};
@@ -88,7 +87,7 @@ fn hello_text() -> String {
         "Ciao.",
         "Buongiorno.",
     ];
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     hellos.choose(&mut rng).expect("random failure").to_string()
 }
