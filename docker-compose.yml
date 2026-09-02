@@ -1,0 +1,35 @@
+version: '2'
+
+# tag1bot is a persistent Slack bot (Socket Mode, outbound-only WebSocket) --
+# no ingress/routes needed. It is not a batch task like time-r, so it uses
+# cli-persistent rather than plain cli: cli-persistent keeps the pod running
+# instead of the pod being killed after the entrypoint returns, and gives us
+# a place to declare the persistent-volume mount for state.sqlite3.
+#
+# lagoon.persistent.class requests a non-default StorageClass ("ebs", added
+# in a companion tag1-lagoon-infra PR). CONFIRMED 2026-09-02 by reading
+# lagoon-build-deploy-tool's Go source (internal/templating/templates_pvc.go,
+# internal/servicetypes/cli.go): this label is not read anywhere in the
+# actual PVC-templating code path today -- it appears only in one test
+# fixture as literal input data. A ReadWriteOnce PVC (what this service
+# needs) gets no StorageClassName set at all right now, so it silently
+# falls back to the cluster's default class. Left the label in place as a
+# statement of intent, but this will NOT select the "ebs" class until
+# lagoon-build-deploy-tool is updated to read it (or "ebs" becomes the
+# cluster default). See PR description for the open question.
+services:
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    labels:
+      lagoon.type: cli-persistent
+      lagoon.persistent: /data
+      lagoon.persistent.class: ebs
+    environment:
+      - SLACK_APP_TOKEN
+      - SLACK_BOT_TOKEN
+      - SLACK_CHANNEL_ID
+      - XE_ACCOUNT_ID
+      - XE_API_KEY
+      - CHATGPT_API_KEY
