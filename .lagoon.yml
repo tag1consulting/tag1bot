@@ -15,6 +15,6 @@ routes:
 #
 # Persistent storage for ./state.sqlite3 (src/db.rs) is declared via the
 # lagoon.persistent* labels on the `cli` service in docker-compose.yml, not
-# in this file -- see docker-compose.yml for the mount path and an open
-# question about whether the requested "ebs" StorageClass is actually
-# honored by the current lagoon-build-deploy-tool fork.
+# in this file -- see docker-compose.yml for the mount path and a TODO
+# blocking real persistence on the intended "ebs" StorageClass until
+# lagoon-build-deploy-tool supports selecting a non-default class.

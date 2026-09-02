@@ -6,17 +6,23 @@ version: '2'
 # instead of the pod being killed after the entrypoint returns, and gives us
 # a place to declare the persistent-volume mount for state.sqlite3.
 #
-# lagoon.persistent.class requests a non-default StorageClass ("ebs", added
-# in a companion tag1-lagoon-infra PR). CONFIRMED 2026-09-02 by reading
-# lagoon-build-deploy-tool's Go source (internal/templating/templates_pvc.go,
-# internal/servicetypes/cli.go): this label is not read anywhere in the
-# actual PVC-templating code path today -- it appears only in one test
-# fixture as literal input data. A ReadWriteOnce PVC (what this service
-# needs) gets no StorageClassName set at all right now, so it silently
-# falls back to the cluster's default class. Left the label in place as a
-# statement of intent, but this will NOT select the "ebs" class until
-# lagoon-build-deploy-tool is updated to read it (or "ebs" becomes the
-# cluster default). See PR description for the open question.
+# TODO(blocked): this service needs its persistent volume on a non-default
+# StorageClass ("ebs", added in a companion tag1-lagoon-infra PR), not the
+# cluster's current default. CONFIRMED 2026-09-02 by reading Tag1's
+# lagoon-build-deploy-tool fork's Go source
+# (internal/templating/templates_pvc.go, internal/servicetypes/cli.go):
+# there is no docker-compose.yml label or .lagoon.yml field that this tool
+# reads to select a StorageClass for a ReadWriteOnce PVC (what this service
+# needs) -- StorageClassName is left nil unconditionally for RWO, so the PVC
+# silently falls back to whatever the cluster's default class is. Only
+# ReadWriteMany volumes get an explicit class, hardcoded to "bulk". A
+# lagoon.persistent.class label exists in one test fixture as literal input
+# data but is not read anywhere in the actual PVC-templating code path.
+# Deliberately NOT writing a lagoon.persistent.class label here -- it would
+# be silently ignored and imply this is wired up when it isn't. Real
+# persistence on the "ebs" class is blocked until lagoon-build-deploy-tool
+# is updated to read a class selector (or "ebs" becomes the cluster
+# default, which has cluster-wide blast radius). See PR description.
 services:
   cli:
     build:
@@ -25,7 +31,6 @@ services:
     labels:
       lagoon.type: cli-persistent
       lagoon.persistent: /data
-      lagoon.persistent.class: ebs
     environment:
       - SLACK_APP_TOKEN
       - SLACK_BOT_TOKEN
