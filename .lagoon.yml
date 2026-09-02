@@ -1,0 +1,20 @@
+docker-compose-yaml: docker-compose.yml
+
+# tag1bot is a persistent Socket Mode bot with no webserver -- it opens an
+# outbound-only WebSocket to Slack, so it needs no ingress/routes.
+routes:
+  autogenerate:
+    enabled: false
+
+# Runtime env vars (SLACK_APP_TOKEN, SLACK_BOT_TOKEN, SLACK_CHANNEL_ID
+# required; XE_ACCOUNT_ID/XE_API_KEY and CHATGPT_API_KEY optional, gate the
+# currency-conversion and ChatGPT features respectively) are declared as
+# pass-through names in docker-compose.yml's `cli` service `environment:`
+# list, per Lagoon convention -- real values are set separately in
+# tag1-lagoon-infra's Pulumi config, not here.
+#
+# Persistent storage for ./state.sqlite3 (src/db.rs) is declared via the
+# lagoon.persistent* labels on the `cli` service in docker-compose.yml, not
+# in this file -- see docker-compose.yml for the mount path and a TODO
+# blocking real persistence on the intended "ebs" StorageClass until
+# lagoon-build-deploy-tool supports selecting a non-default class.
