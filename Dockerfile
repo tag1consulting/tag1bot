@@ -31,11 +31,12 @@ RUN apt-get update \
 # (see src/db.rs: const DATABASE_FILE: &str = "./state.sqlite3") -- WORKDIR
 # is set to the Lagoon persistent-volume mount path so the database lands on
 # durable storage instead of ephemeral container storage. See .lagoon.yml.
-RUN useradd --create-home --shell /usr/sbin/nologin tag1bot
+RUN groupadd --gid 10000 tag1bot \
+    && useradd --uid 10000 --gid tag1bot --create-home --shell /usr/sbin/nologin tag1bot
 WORKDIR /data
 COPY --from=builder /build/target/release/tag1bot /usr/local/bin/tag1bot
 RUN chown tag1bot:tag1bot /data
 
-USER tag1bot
+USER 10000:10000
 
 ENTRYPOINT ["/usr/local/bin/tag1bot"]
