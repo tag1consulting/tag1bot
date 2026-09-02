@@ -1,0 +1,155 @@
+# AI PR Review — unified single-file setup (container-action variant)
+#
+# Adapted from tag1consulting/ai-pr-review examples/workflows/pr-review.yml (v2.4.2).
+# This single file handles BOTH automatic PR reviews (on pull_request) AND slash
+# commands (/ai-pr-review rescan, dismiss, etc.) via per-job event gating.
+#
+# ── Secrets ──────────────────────────────────────────────────────────────────
+#   AI_REVIEW_API_KEY (or ANTHROPIC_API_KEY) — LLM provider API key. This repo
+#     already has ANTHROPIC_API_KEY set, which the workflow falls back to.
+#   GH_TOKEN — PAT (repo scope) or GitHub App token. Required only for the
+#     dismiss command's resolveReviewThread mutation. Not yet configured on
+#     this repo; add it later if the dismiss command is needed.
+#   GITHUB_TOKEN — built-in; used for comment posts, reactions, reads, labels,
+#     and checkout so those operations post as github-actions[bot].
+#
+# ── Repo variables ────────────────────────────────────────────────────────────
+#   AI_REVIEW_FEEDBACK_LOOP is set explicitly to 'false' as a repo variable
+#   (Settings → Variables) so the learning-loop feature can be flipped on
+#   later by editing the variable, with no follow-on commit to this file.
+#
+# ── Default branch note ──────────────────────────────────────────────────────
+# issue_comment and pull_request_review_comment workflows run from the DEFAULT
+# BRANCH only. Slash commands will not respond until this file is merged to
+# main. The automatic PR review (pull_request trigger) fires as soon as the
+# file is on a PR branch.
+
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  # ── Automatic PR review ────────────────────────────────────────────────────
+  # Fires only on pull_request events. Skips drafts and PRs labeled
+  # 'skip-ai-review'. The slash-commands job below is skipped on this event.
+  review:
+    if: >-
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-ai-review')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ai-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run AI review
+        uses: tag1consulting/ai-pr-review/container-action@main
+        env:
+          FORCE_FULL_DIFF: ${{ contains(github.event.pull_request.labels.*.name, 'ai-review-rescan') }}
+        with:
+          image-tag: ${{ vars.AI_REVIEW_IMAGE_TAG || 'latest' }}
+          api-key: ${{ secrets.AI_REVIEW_API_KEY || secrets.ANTHROPIC_API_KEY }}
+          github-token: ${{ github.token }}
+          pr-number: ${{ github.event.pull_request.number }}
+          base-ref: ${{ github.event.pull_request.base.ref }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          provider: ${{ vars.AI_REVIEW_PROVIDER || 'anthropic' }}
+          base-url: ${{ vars.AI_REVIEW_BASE_URL || '' }}
+          model-standard: ${{ vars.AI_REVIEW_MODEL_STANDARD || '' }}
+          model-premium: ${{ vars.AI_REVIEW_MODEL_PREMIUM || '' }}
+          review-mode: >-
+            ${{
+              contains(github.event.pull_request.labels.*.name, 'ai-review-full') && 'full' ||
+              startsWith(github.event.pull_request.head.ref, 'release/') && 'full' ||
+              'quick'
+            }}
+          max-diff-lines: ${{ vars.AI_REVIEW_MAX_DIFF_LINES || '5000' }}
+          max-inline: ${{ vars.AI_REVIEW_MAX_INLINE || '25' }}
+          max-tokens-per-agent: ${{ vars.AI_REVIEW_MAX_TOKENS_PER_AGENT || '8192' }}
+          enable-suggestions: ${{ vars.AI_REVIEW_ENABLE_SUGGESTIONS || 'true' }}
+          parallel: ${{ vars.AI_REVIEW_PARALLEL || 'true' }}
+          ignore-merge-commits: ${{ vars.AI_REVIEW_IGNORE_MERGE_COMMITS || 'true' }}
+          context-enrichment: ${{ vars.AI_REVIEW_CONTEXT_ENRICHMENT || 'false' }}
+          sarif-paths: ${{ vars.AI_REVIEW_SARIF_PATHS || '' }}
+          exclude-patterns: ${{ vars.AI_REVIEW_EXCLUDE_PATTERNS || '' }}
+          exclude-patterns-mode: ${{ vars.AI_REVIEW_EXCLUDE_PATTERNS_MODE || 'append' }}
+          analyzer-diff-scope: ${{ vars.AI_REVIEW_ANALYZER_DIFF_SCOPE || 'cap' }}
+          feedback-loop: ${{ vars.AI_REVIEW_FEEDBACK_LOOP || 'false' }}
+          # --- Analyzer / agent filtering (Python engine; empty = all) ---
+          analyzers: ${{ vars.AI_REVIEW_ANALYZERS || '' }}
+          exclude-analyzers: ${{ vars.AI_REVIEW_EXCLUDE_ANALYZERS || '' }}
+          agents: ${{ vars.AI_REVIEW_AGENTS || '' }}
+          exclude-agents: ${{ vars.AI_REVIEW_EXCLUDE_AGENTS || '' }}
+
+  # ── Slash commands ─────────────────────────────────────────────────────────
+  # Fires only on issue_comment and pull_request_review_comment events.
+  # The review job above is skipped on those events.
+  #
+  # Supported commands (post as a PR comment):
+  #   /ai-pr-review rescan        — force full diff, re-run review
+  #   /ai-pr-review review-full   — run in full mode (all agents)
+  #   /ai-pr-review skip          — add skip-ai-review label to suppress next review
+  #   /ai-pr-review dismiss       — reply to an inline finding to dismiss it
+  #   /ai-pr-review dismiss F<n>  — dismiss a body-level finding by its stable ID
+  #   /ai-pr-review help          — post the command list as a reply
+  #   /ai-pr-review false-positive [F<n>] [reason]  — record a false-positive verdict
+  #   /ai-pr-review wont-fix [F<n>] [reason]        — record a "won't fix" verdict
+  #   /ai-pr-review feedback <text>                 — store free-form feedback
+  slash-commands:
+    if: >-
+      (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
+      startsWith(github.event.comment.body, '/ai-pr-review') &&
+      contains(
+        fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+        github.event.comment.author_association
+      ) &&
+      (github.event_name == 'pull_request_review_comment' ||
+       (github.event_name == 'issue_comment' && github.event.issue.pull_request))
+    uses: tag1consulting/ai-pr-review/.github/workflows/slash-commands.yml@main
+    with:
+      event-name: ${{ github.event_name }}
+      comment-body: ${{ github.event.comment.body }}
+      comment-id: ${{ github.event.comment.id }}
+      comment-author-association: ${{ github.event.comment.author_association }}
+      issue-number: ${{ github.event.issue.number || '' }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      in-reply-to-id: ${{ github.event.comment.in_reply_to_id || '' }}
+      is-pull-request: ${{ github.event.issue.pull_request && 'true' || 'false' }}
+      repository: ${{ github.repository }}
+      repository-owner: ${{ github.repository_owner }}
+      repository-name: ${{ github.event.repository.name }}
+      actor-login: ${{ github.event.comment.user.login }}
+      provider: ${{ vars.AI_REVIEW_PROVIDER || 'anthropic' }}
+      base-url: ${{ vars.AI_REVIEW_BASE_URL || '' }}
+      image-tag: ${{ vars.AI_REVIEW_IMAGE_TAG || 'latest' }}
+      review-mode-default: ${{ vars.AI_REVIEW_MODE_DEFAULT || 'quick' }}
+      enable-feedback-loop: ${{ vars.AI_REVIEW_FEEDBACK_LOOP || 'false' }}
+      # --- Analyzer / agent filtering: forwarded so rescan/review-full stay in
+      # sync with the review job above (set the repo variables once) ---
+      analyzers: ${{ vars.AI_REVIEW_ANALYZERS || '' }}
+      exclude-analyzers: ${{ vars.AI_REVIEW_EXCLUDE_ANALYZERS || '' }}
+      agents: ${{ vars.AI_REVIEW_AGENTS || '' }}
+      exclude-agents: ${{ vars.AI_REVIEW_EXCLUDE_AGENTS || '' }}
+    secrets:
+      api-key: ${{ secrets.AI_REVIEW_API_KEY || secrets.ANTHROPIC_API_KEY }}
+      # GH_TOKEN must be a PAT (repo scope) or GitHub App token — not GITHUB_TOKEN.
+      # Required only for the dismiss command's resolveReviewThread mutation.
+      github-token: ${{ secrets.GH_TOKEN }}
+      # Built-in GITHUB_TOKEN: used for plain comment posts, reactions, reads,
+      # and label changes so those operations post as github-actions[bot].
+      actions-token: ${{ secrets.GITHUB_TOKEN }}
